@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createAdminClient } from '@/lib/supabase/server'
+import { createServiceClient } from '@/lib/supabase/server'
 import { generateImage } from '@/lib/ai/openai'
 
 interface ImageRequest {
@@ -9,7 +9,7 @@ interface ImageRequest {
 export async function POST(req: NextRequest) {
   const { suggestionId }: ImageRequest = await req.json()
 
-  const supabase = await createAdminClient()
+  const supabase = createServiceClient()
 
   const { data: rawSuggestion } = await supabase
     .from('content_suggestions')
@@ -51,7 +51,7 @@ Fotorrealista, alta qualidade, luz natural, foco no produto. Sem texto na imagem
     .upload(storagePath, imageBuffer, { contentType: 'image/png', upsert: true })
 
   if (uploadError) {
-    console.error('Storage upload failed:', uploadError)
+    console.error('Supabase storage upload error:', uploadError)
     return NextResponse.json({ error: 'Storage upload failed' }, { status: 500 })
   }
 
