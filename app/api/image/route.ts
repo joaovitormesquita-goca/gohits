@@ -37,31 +37,26 @@ Formato: ${isVertical ? '9:16 vertical (TikTok/Reels)' : '1:1 quadrado (feed)'}
 
 Fotorrealista, alta qualidade, luz natural, foco no produto. Sem texto na imagem.`
 
-  let imageUrl: string
+  let imageBuffer: Buffer
   try {
-    imageUrl = await generateImage(prompt, size as '1024x1536' | '1024x1024')
+    imageBuffer = await generateImage(prompt, size as '1024x1536' | '1024x1024')
   } catch (err) {
     console.error('GPT-image-1 failed:', err)
     return NextResponse.json({ error: 'Image generation failed' }, { status: 500 })
   }
 
-  // Download and re-upload to Supabase Storage
-  try {
-    const imageResp = await fetch(imageUrl)
-    const imageBuffer = Buffer.from(await imageResp.arrayBuffer())
-    const storagePath = `${suggestionId}/image.png`
+  const storagePath = `${suggestionId}/image.png`
+  const { error: uploadError } = await supabase.storage
+    .from('suggestions')
+    .upload(storagePath, imageBuffer, { contentType: 'image/png', upsert: true })
 
-    const { error: uploadError } = await supabase.storage
-      .from('suggestions')
-      .upload(storagePath, imageBuffer, { contentType: 'image/png', upsert: true })
-
-    if (!uploadError) {
-      const { data: publicData } = supabase.storage.from('suggestions').getPublicUrl(storagePath)
-      imageUrl = publicData.publicUrl
-    }
-  } catch {
-    // Keep original CDN URL if storage upload fails
+  if (uploadError) {
+    console.error('Storage upload failed:', uploadError)
+    return NextResponse.json({ error: 'Storage upload failed' }, { status: 500 })
   }
+
+  const { data: publicData } = supabase.storage.from('suggestions').getPublicUrl(storagePath)
+  const imageUrl = publicData.publicUrl
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   await (supabase.from('content_suggestions') as any)
