@@ -6,9 +6,7 @@ import { toast } from 'sonner'
 import ContentCard from '@/components/ContentCard'
 import ImportCSVModal from '@/components/ImportCSVModal'
 import HitInsightsCard, { type HitInsights } from '@/components/HitInsightsCard'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 
 interface AnaliseHitsClientProps {
@@ -123,87 +121,148 @@ export default function AnaliseHitsClient({ brands, contents, metaStatusMap = {}
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-start justify-between gap-4">
+    <div className="space-y-7">
+      {/* Header */}
+      <div className="flex items-end justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-2xl font-bold">Análise de Hits</h1>
-          <p className="text-muted-foreground text-sm">{filtered.length} hits</p>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] mb-2" style={{ color: '#7ba1d8' }}>
+            Monitoramento de performance
+          </p>
+          <h1 className="text-3xl font-bold tracking-tight" style={{ color: '#2659a5', letterSpacing: '-0.015em' }}>
+            Análise de Hits
+          </h1>
+          <p className="text-sm mt-1.5" style={{ color: '#7ba1d8' }}>
+            {filtered.length} hits · Avalie replicabilidade e gere variações cross-brand.
+          </p>
         </div>
-        <div className="flex gap-2">
-          <Button
+        <div className="flex gap-2.5">
+          <button
             onClick={runAnalysis}
             disabled={analyzing}
-            variant="outline"
-            size="sm"
+            className="text-xs font-semibold transition-opacity hover:opacity-80 disabled:opacity-50"
+            style={{ padding: '10px 18px', borderRadius: 999, background: '#ffffff', color: '#2659a5', border: '1px solid rgba(38,89,165,0.28)' }}
           >
-            {analyzing ? '⏳ Analisando...' : '🔍 Analisar Hits'}
-          </Button>
-          <Button onClick={() => setImportModalOpen(true)} variant="outline" size="sm">
-            📥 Importar CSV
-          </Button>
+            {analyzing ? 'Analisando...' : 'Analisar Hits'}
+          </button>
+          <button
+            onClick={() => setImportModalOpen(true)}
+            className="text-xs font-semibold transition-opacity hover:opacity-80"
+            style={{ padding: '10px 18px', borderRadius: 999, background: '#2659a5', color: '#ffffff' }}
+          >
+            Importar CSV
+          </button>
         </div>
       </div>
 
       {/* Top 5 */}
-      <div>
-        <h2 className="font-semibold mb-3 flex items-center gap-2">
-          🔥 Top 5 Hits
-          <Badge variant="secondary">por views</Badge>
-        </h2>
-        <div className="flex flex-wrap gap-2">
-          {top5.map((c, i) => (
-            <div key={c.id} className="flex items-center gap-2 bg-muted rounded-full px-3 py-1 text-sm">
-              <span className="font-bold text-muted-foreground">#{i + 1}</span>
-              <span>{c.name ?? c.hook?.substring(0, 30)}</span>
-              <Badge variant="outline" className="text-xs">{c.brands?.name}</Badge>
-            </div>
-          ))}
+      {top5.length > 0 && (
+        <div>
+          <div className="flex items-center gap-2.5 mb-4">
+            <div className="w-1.5 h-1.5 rounded-full" style={{ background: '#d7d900' }} />
+            <span className="text-sm font-semibold" style={{ color: '#2659a5' }}>Top 5 Hits</span>
+            <span className="text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full" style={{ background: '#eaf1fa', color: '#7ba1d8' }}>
+              por views
+            </span>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {top5.map((c, i) => (
+              <div
+                key={c.id}
+                className="flex items-center gap-2 rounded-full text-sm"
+                style={{ background: '#eaf1fa', padding: '6px 14px' }}
+              >
+                <span className="font-bold text-xs" style={{ color: '#7ba1d8' }}>#{i + 1}</span>
+                <span className="font-medium" style={{ color: '#2659a5' }}>{c.name ?? c.hook?.substring(0, 30)}</span>
+                {c.brands && (
+                  <span
+                    className="text-[10px] font-semibold px-2 py-0.5 rounded-full"
+                    style={{ background: '#2659a5', color: '#d7d900' }}
+                  >
+                    {c.brands.name}
+                  </span>
+                )}
+              </div>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Filters */}
-      <div className="flex flex-wrap gap-3">
-        <Select value={filterBrand} onValueChange={(v) => v && setFilterBrand(v)}>
-          <SelectTrigger className="w-36">
-            <SelectValue placeholder="Marca" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todas</SelectItem>
-            {brands.map((b) => <SelectItem key={b.slug} value={b.slug}>{b.name}</SelectItem>)}
-          </SelectContent>
-        </Select>
-        <Select value={filterPlatform} onValueChange={(v) => v && setFilterPlatform(v)}>
-          <SelectTrigger className="w-36">
-            <SelectValue placeholder="Plataforma" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todas</SelectItem>
-            <SelectItem value="tiktok">TikTok</SelectItem>
-            <SelectItem value="meta">Meta</SelectItem>
-            <SelectItem value="archive">Archive</SelectItem>
-          </SelectContent>
-        </Select>
+      <div className="flex flex-wrap gap-3 items-center">
+        {/* Brand pills */}
+        <div className="flex gap-1.5 flex-wrap">
+          {['all', ...brands.map((b) => b.slug)].map((slug) => {
+            const isActive = filterBrand === slug
+            return (
+              <button
+                key={slug}
+                onClick={() => setFilterBrand(slug)}
+                className="text-xs font-medium transition-all"
+                style={{
+                  padding: '6px 14px', borderRadius: 999,
+                  background: isActive ? '#2659a5' : '#eaf1fa',
+                  color: isActive ? '#ffffff' : '#7ba1d8',
+                }}
+              >
+                {slug === 'all' ? 'Todas as marcas' : brands.find((b) => b.slug === slug)?.name}
+              </button>
+            )
+          })}
+        </div>
+
+        {/* Platform pills */}
+        <div className="flex gap-1.5 flex-wrap">
+          {['all', 'tiktok', 'meta', 'archive'].map((p) => {
+            const isActive = filterPlatform === p
+            return (
+              <button
+                key={p}
+                onClick={() => setFilterPlatform(p)}
+                className="text-xs font-medium transition-all"
+                style={{
+                  padding: '6px 12px', borderRadius: 999,
+                  background: isActive ? '#d7d900' : 'transparent',
+                  color: isActive ? '#2659a5' : '#7ba1d8',
+                  border: '1px solid rgba(38,89,165,0.14)',
+                }}
+              >
+                {p === 'all' ? 'Todas' : p.charAt(0).toUpperCase() + p.slice(1)}
+              </button>
+            )
+          })}
+        </div>
+
         {Object.keys(insights).length > 0 && (
-          <Button variant="ghost" size="sm" onClick={() => setInsights({})}>
-            ✕ Limpar análise
-          </Button>
+          <button
+            className="text-xs font-medium transition-opacity hover:opacity-70"
+            style={{ color: '#7ba1d8', padding: '6px 12px', borderRadius: 999 }}
+            onClick={() => setInsights({})}
+          >
+            Limpar análise
+          </button>
         )}
       </div>
 
       {/* Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {filtered.map((c) => {
           const metaInfo = metaStatusMap[c.id]
           const contentInsights = insights[c.id]
           const liveMetrics = metaInsights[c.id]
           return (
-            <div key={c.id}>
+            <div key={c.id} className="space-y-2">
               {c.brands && (
-                <div className="mb-1 flex items-center gap-2 flex-wrap">
-                  <Badge variant="outline" className="text-xs">{c.brands.name}</Badge>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span
+                    className="text-[10px] font-semibold uppercase tracking-wide px-2.5 py-0.5 rounded-full"
+                    style={{ background: '#2659a5', color: '#d7d900' }}
+                  >
+                    {c.brands.name}
+                  </span>
                   {metaInfo?.meta_status && (
                     <button
-                      className="text-xs text-blue-600 hover:underline"
+                      className="text-xs font-medium underline underline-offset-2 hover:opacity-70"
+                      style={{ color: '#7ba1d8' }}
                       onClick={() => fetchMetaInsights(metaInfo.suggestion_id, c.id)}
                     >
                       {META_STATUS_LABEL[metaInfo.meta_status] ?? metaInfo.meta_status}
@@ -213,18 +272,20 @@ export default function AnaliseHitsClient({ brands, contents, metaStatusMap = {}
               )}
               <ContentCard
                 content={c}
+                variant="hit"
                 showMetrics
                 onGenerate={() => setGenerateModal({ contentId: c.id, contentName: c.name ?? c.hook ?? '' })}
               />
-              {/* Live Meta Ads metrics */}
               {liveMetrics && (
-                <div className="mt-1 rounded border bg-blue-50 p-2 text-xs text-blue-800 flex gap-3">
+                <div
+                  className="rounded-[14px] p-3 text-xs flex gap-4"
+                  style={{ background: '#eaf1fa', color: '#2659a5' }}
+                >
                   <span>CTR real: <strong>{(liveMetrics.ctr * 100).toFixed(2)}%</strong></span>
                   <span>Impressões: <strong>{liveMetrics.impressions.toLocaleString('pt-BR')}</strong></span>
                   <span>Spend: <strong>R${liveMetrics.spend.toFixed(2)}</strong></span>
                 </div>
               )}
-              {/* AI Insights */}
               {contentInsights && <HitInsightsCard insights={contentInsights} />}
             </div>
           )
@@ -236,11 +297,11 @@ export default function AnaliseHitsClient({ brands, contents, metaStatusMap = {}
         <Dialog open onOpenChange={() => setGenerateModal(null)}>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Gerar réplicas para outras marcas</DialogTitle>
+              <DialogTitle style={{ color: '#2659a5' }}>Gerar réplicas para outras marcas</DialogTitle>
             </DialogHeader>
             <div className="space-y-4">
-              <p className="text-sm text-muted-foreground">{generateModal.contentName}</p>
-              <p className="text-xs text-muted-foreground">Geração de imagem via GPT-image-1 para validação de CTR.</p>
+              <p className="text-sm" style={{ color: '#7ba1d8' }}>{generateModal.contentName}</p>
+              <p className="text-xs" style={{ color: '#7ba1d8' }}>Geração de imagem via GPT-image-1 para validação de CTR.</p>
               <div className="flex gap-2">
                 <Button variant="outline" onClick={() => setGenerateModal(null)} className="flex-1">
                   Cancelar
