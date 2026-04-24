@@ -15,6 +15,4 @@ export interface SuggestionWithTargetBrand extends ContentSuggestion {
   target_brand: Brand | null
 }
 
-export interface VideoTemplateResult extends VideoTemplate {
-  // no extra fields
-}
+export type VideoTemplateResult = VideoTemplate

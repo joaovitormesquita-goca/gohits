@@ -1,8 +1,10 @@
 'use client'
 
 import { useState, useMemo } from 'react'
+import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import ContentCard from '@/components/ContentCard'
+import ImportCSVModal from '@/components/ImportCSVModal'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -16,8 +18,10 @@ interface AnaliseHitsClientProps {
 }
 
 export default function AnaliseHitsClient({ brands, contents }: AnaliseHitsClientProps) {
+  const router = useRouter()
   const [filterBrand, setFilterBrand] = useState<string>('all')
   const [filterPlatform, setFilterPlatform] = useState<string>('all')
+  const [importModalOpen, setImportModalOpen] = useState(false)
   const [generateModal, setGenerateModal] = useState<{ contentId: string; contentName: string } | null>(null)
   const [outputMode, setOutputMode] = useState<'image' | 'video'>('image')
   const [generating, setGenerating] = useState(false)
@@ -68,9 +72,14 @@ export default function AnaliseHitsClient({ brands, contents }: AnaliseHitsClien
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Análise de Hits</h1>
-        <p className="text-muted-foreground text-sm">{filtered.length} hits</p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold">Análise de Hits</h1>
+          <p className="text-muted-foreground text-sm">{filtered.length} hits</p>
+        </div>
+        <Button onClick={() => setImportModalOpen(true)} variant="outline" size="sm">
+          📥 Importar CSV
+        </Button>
       </div>
 
       {/* Top 5 */}
@@ -169,6 +178,12 @@ export default function AnaliseHitsClient({ brands, contents }: AnaliseHitsClien
           </DialogContent>
         </Dialog>
       )}
+
+      <ImportCSVModal
+        open={importModalOpen}
+        onClose={() => setImportModalOpen(false)}
+        onSuccess={() => router.refresh()}
+      />
     </div>
   )
 }
