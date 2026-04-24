@@ -17,7 +17,7 @@
 
 \i seed/01_brands.sql
 -- \i seed/02_video_templates.sql
--- \i seed/03_contents.sql
--- \i seed/04_content_metrics.sql
+\i seed/03_contents.sql
+\i seed/04_content_metrics.sql
 -- \i seed/05_external_references.sql
 -- \i seed/06_settings.sql
