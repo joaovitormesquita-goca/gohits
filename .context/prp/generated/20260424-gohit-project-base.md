@@ -494,6 +494,6 @@ Por cada phase:
 
 **Created:** 2026-04-24
 **Author:** lucas.braide@gocase.com
-**Status:** In Progress
+**Status:** In Progress — Phases 1-5 complete, Phase 6 (deploy) pending env vars
 
 **Spec source:** `maquina-de-hits.md` (Gohit Hackathon Spec v1)
