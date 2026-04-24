@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createAdminClient } from '@/lib/supabase/server'
+import { createServiceClient } from '@/lib/supabase/server'
 import { generateImage } from '@/lib/ai/openai'
 
 interface ImageRequest {
@@ -9,7 +9,7 @@ interface ImageRequest {
 export async function POST(req: NextRequest) {
   const { suggestionId }: ImageRequest = await req.json()
 
-  const supabase = await createAdminClient()
+  const supabase = createServiceClient()
 
   const { data: rawSuggestion } = await supabase
     .from('content_suggestions')
@@ -45,22 +45,27 @@ Fotorrealista, alta qualidade, luz natural, foco no produto. Sem texto na imagem
     return NextResponse.json({ error: 'Image generation failed' }, { status: 500 })
   }
 
-  // Download and re-upload to Supabase Storage
+  // Download from OpenAI CDN and re-upload to Supabase Storage for persistence
+  const storagePath = `${suggestionId}/image.png`
   try {
     const imageResp = await fetch(imageUrl)
+    if (!imageResp.ok) throw new Error(`Failed to fetch image from OpenAI: ${imageResp.status}`)
     const imageBuffer = Buffer.from(await imageResp.arrayBuffer())
-    const storagePath = `${suggestionId}/image.png`
 
     const { error: uploadError } = await supabase.storage
       .from('suggestions')
       .upload(storagePath, imageBuffer, { contentType: 'image/png', upsert: true })
 
-    if (!uploadError) {
+    if (uploadError) {
+      console.error('Supabase storage upload error:', uploadError)
+      // Fall through — keep the OpenAI URL (temporary, ~1h)
+    } else {
       const { data: publicData } = supabase.storage.from('suggestions').getPublicUrl(storagePath)
       imageUrl = publicData.publicUrl
     }
-  } catch {
-    // Keep original CDN URL if storage upload fails
+  } catch (err) {
+    console.error('Storage upload failed:', err)
+    // Keep original OpenAI URL
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
