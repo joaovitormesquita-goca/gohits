@@ -3,10 +3,8 @@
 import { useState, useMemo } from 'react'
 import { toast } from 'sonner'
 import LigarNoPlayModal from '@/components/LigarNoPlayModal'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import ContentCard from '@/components/ContentCard'
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 
 interface XadrezClientProps {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -15,37 +13,102 @@ interface XadrezClientProps {
   matrix: any[]
 }
 
-function cellIcon(row: { status: string | null; is_replicable: boolean | null; suggestion_id: string | null; output_mode: string | null }): string {
-  if (!row.suggestion_id) return '⬜'
-  if (row.status === 'not_replicable' || row.is_replicable === false) return '❌'
-  if (row.status === 'draft') return '⏳'
-  if (row.status === 'approved' || row.status === 'in_play' || row.status === 'published') return '✅'
-  if (row.status === 'rejected') return '🚫'
-  return '⬜'
+type CellStatus = 'auto' | 'manual' | 'pending' | 'not_replicable' | 'rejected' | 'na' | 'empty'
+
+function getCellStatus(row: {
+  status: string | null
+  is_replicable: boolean | null
+  suggestion_id: string | null
+  output_mode: string | null
+}): CellStatus {
+  if (!row.suggestion_id) return 'empty'
+  if (row.status === 'not_replicable' || row.is_replicable === false) return 'not_replicable'
+  if (row.status === 'rejected') return 'rejected'
+  if (row.status === 'draft') return 'pending'
+  if (['approved', 'in_play', 'published'].includes(row.status ?? '')) {
+    return row.output_mode ? 'auto' : 'manual'
+  }
+  return 'pending'
 }
 
-function outputIcon(outputMode: string | null): string {
-  if (outputMode === 'image') return '🖼️'
-  if (outputMode === 'video') return '🎥'
-  return ''
+function XCell({ status, label, onClick }: { status: CellStatus; label?: string; onClick?: () => void }) {
+  const dotStyles: Record<CellStatus, React.CSSProperties> = {
+    auto: { background: '#2659a5', color: '#d7d900', border: 'none' },
+    manual: { background: '#d7d900', color: '#2659a5', border: 'none' },
+    pending: { background: 'transparent', color: '#7ba1d8', border: '1.5px dashed rgba(38,89,165,0.28)' },
+    not_replicable: { background: 'rgba(229,39,60,0.1)', color: '#e5273c', border: '1px solid rgba(229,39,60,0.2)' },
+    rejected: { background: 'rgba(38,89,165,0.06)', color: '#7ba1d8', border: 'none' },
+    empty: { background: 'transparent', color: 'rgba(38,89,165,0.2)', border: '1px dashed rgba(38,89,165,0.14)' },
+    na: { background: 'transparent', color: 'rgba(38,89,165,0.2)', border: 'none' },
+  }
+  const dotLabels: Record<CellStatus, string> = {
+    auto: '✓',
+    manual: '✓',
+    pending: '–',
+    not_replicable: '✕',
+    rejected: '✕',
+    empty: '',
+    na: '—',
+  }
+  const subLabels: Record<CellStatus, string> = {
+    auto: label ?? 'Auto',
+    manual: 'Manual',
+    pending: 'Pendente',
+    not_replicable: 'Inválido',
+    rejected: 'Rejeitado',
+    empty: 'Vazio',
+    na: '',
+  }
+
+  return (
+    <div
+      className={`flex flex-col items-center justify-center gap-1.5 py-3 ${onClick ? 'cursor-pointer' : ''}`}
+      onClick={onClick}
+    >
+      <div
+        className="w-7 h-7 rounded-lg flex items-center justify-center font-bold text-sm"
+        style={dotStyles[status]}
+      >
+        {dotLabels[status]}
+      </div>
+      {status !== 'na' && status !== 'empty' && (
+        <span className="text-[9px] font-medium text-center leading-tight" style={{ color: '#7ba1d8' }}>
+          {subLabels[status]}
+        </span>
+      )}
+    </div>
+  )
 }
 
 export default function XadrezClient({ brands, matrix }: XadrezClientProps) {
   const [selectedCell, setSelectedCell] = useState<typeof matrix[number] | null>(null)
   const [ligarModal, setLigarModal] = useState<typeof matrix[number] | null>(null)
   const [filterOriginBrand, setFilterOriginBrand] = useState<string>('all')
+  const [hideNotReplicable, setHideNotReplicable] = useState<boolean>(true)
 
-  // Get unique content rows (hits)
   const contents = useMemo(() => {
     const seen = new Set<string>()
-    return matrix.filter((row) => {
+    const unique = matrix.filter((row) => {
       if (seen.has(row.content_id)) return false
       seen.add(row.content_id)
       return true
-    }).filter((row) => filterOriginBrand === 'all' || row.origin_brand_slug === filterOriginBrand)
-  }, [matrix, filterOriginBrand])
+    })
 
-  // Stats
+    return unique.filter((row) => {
+      if (filterOriginBrand !== 'all' && row.origin_brand_slug !== filterOriginBrand) return false
+      if (hideNotReplicable) {
+        const nonOriginCells = matrix.filter(
+          (r) => r.content_id === row.content_id && r.target_brand_id !== row.origin_brand_id
+        )
+        const allNotReplicable =
+          nonOriginCells.length > 0 &&
+          nonOriginCells.every((r) => r.status === 'not_replicable' || r.is_replicable === false)
+        if (allNotReplicable) return false
+      }
+      return true
+    })
+  }, [matrix, filterOriginBrand, hideNotReplicable])
+
   const stats = useMemo(() => {
     const totalCells = matrix.length
     const generated = matrix.filter((r) => r.suggestion_id).length
@@ -70,133 +133,250 @@ export default function XadrezClient({ brands, matrix }: XadrezClientProps) {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-7">
+      {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold">Xadrez de Replicação</h1>
-        <p className="text-muted-foreground text-sm">Clique em uma célula para ver os detalhes</p>
+        <p className="text-[11px] font-semibold uppercase tracking-[0.14em] mb-2" style={{ color: '#7ba1d8' }}>
+          Execução cross-brand · Abril 2026
+        </p>
+        <h1 className="text-3xl font-bold tracking-tight" style={{ color: '#2659a5', letterSpacing: '-0.015em' }}>
+          Xadrez
+        </h1>
+        <p className="text-sm mt-1.5" style={{ color: '#7ba1d8' }}>
+          Cada hit × cada marca, com o checklist completo de replicação.
+        </p>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+      {/* KPI Row */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
         {[
-          { label: 'Total', value: stats.totalCells, color: '' },
-          { label: 'Geradas', value: `${stats.generated} (${stats.totalCells ? Math.round(stats.generated / stats.totalCells * 100) : 0}%)`, color: 'text-blue-600' },
-          { label: 'Aprovadas', value: `${stats.approved} (${stats.totalCells ? Math.round(stats.approved / stats.totalCells * 100) : 0}%)`, color: 'text-green-600' },
-          { label: 'Não replicáveis', value: `${stats.notReplicable} (${stats.totalCells ? Math.round(stats.notReplicable / stats.totalCells * 100) : 0}%)`, color: 'text-red-500' },
-          { label: 'Pendentes', value: `${stats.pending} (${stats.totalCells ? Math.round(stats.pending / stats.totalCells * 100) : 0}%)`, color: 'text-yellow-600' },
-        ].map((s) => (
-          <div key={s.label} className="bg-muted/50 rounded-lg p-3 text-center">
-            <div className={`text-xl font-bold ${s.color}`}>{s.value}</div>
-            <div className="text-xs text-muted-foreground">{s.label}</div>
+          { label: 'Total combinações', value: stats.totalCells, sub: `${contents.length} hits visíveis`, variant: 'default' },
+          { label: 'Geradas', value: stats.generated, sub: stats.totalCells ? `${Math.round(stats.generated / stats.totalCells * 100)}% do total` : '—', variant: 'blue' },
+          { label: 'Aprovadas', value: stats.approved, sub: stats.totalCells ? `${Math.round(stats.approved / stats.totalCells * 100)}% do total` : '—', variant: 'yellow' },
+          { label: 'Não replicáveis', value: stats.notReplicable, sub: 'IA rejeitou', variant: 'default' },
+        ].map((kpi) => (
+          <div
+            key={kpi.label}
+            className="relative p-5 overflow-hidden"
+            style={{
+              background: kpi.variant === 'yellow' ? '#d7d900'
+                : kpi.variant === 'blue' ? '#2659a5'
+                : '#ffffff',
+              border: kpi.variant === 'yellow' || kpi.variant === 'blue' ? 'none' : '1px solid rgba(38,89,165,0.14)',
+              borderRadius: 22,
+            }}
+          >
+            <div
+              className="absolute top-4 right-4 w-2.5 h-2.5 rounded-full"
+              style={{ background: kpi.variant === 'yellow' ? '#2659a5' : kpi.variant === 'blue' ? '#d7d900' : '#d7d900' }}
+            />
+            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] mb-2.5"
+              style={{ color: kpi.variant === 'yellow' ? '#2659a5' : kpi.variant === 'blue' ? 'rgba(255,255,255,0.7)' : '#7ba1d8' }}>
+              {kpi.label}
+            </p>
+            <p className="text-4xl font-bold leading-none"
+              style={{
+                color: kpi.variant === 'yellow' ? '#2659a5' : kpi.variant === 'blue' ? '#ffffff' : '#2659a5',
+                letterSpacing: '-0.02em',
+              }}>
+              {kpi.value}
+            </p>
+            <p className="text-[11px] mt-2 font-medium"
+              style={{ color: kpi.variant === 'yellow' ? '#2659a5' : kpi.variant === 'blue' ? '#d7d900' : '#7ba1d8' }}>
+              {kpi.sub}
+            </p>
           </div>
         ))}
       </div>
 
-      {/* Filter */}
-      <div className="flex gap-2 flex-wrap">
-        <span className="text-sm text-muted-foreground self-center">Marca origem:</span>
-        {['all', ...brands.map((b) => b.slug)].map((slug) => (
-          <Button
-            key={slug}
-            variant={filterOriginBrand === slug ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => setFilterOriginBrand(slug)}
+      {/* Filters + Legend */}
+      <div className="flex items-center justify-between gap-4 flex-wrap">
+        <div className="flex flex-wrap gap-3 items-center">
+          {/* Origin brand pills */}
+          <div className="flex gap-1.5 flex-wrap items-center">
+            <span className="text-xs font-medium" style={{ color: '#7ba1d8' }}>Marca origem:</span>
+            {['all', ...brands.map((b) => b.slug)].map((slug) => {
+              const isActive = filterOriginBrand === slug
+              return (
+                <button
+                  key={slug}
+                  onClick={() => setFilterOriginBrand(slug)}
+                  className="text-xs font-medium transition-all"
+                  style={{
+                    padding: '6px 14px', borderRadius: 999,
+                    background: isActive ? '#2659a5' : '#eaf1fa',
+                    color: isActive ? '#ffffff' : '#7ba1d8',
+                  }}
+                >
+                  {slug === 'all' ? 'Todas' : brands.find((b) => b.slug === slug)?.name}
+                </button>
+              )
+            })}
+          </div>
+
+          {/* Not-replicable toggle */}
+          <button
+            onClick={() => setHideNotReplicable((v) => !v)}
+            className="inline-flex items-center gap-2 text-xs font-medium transition-all"
+            style={{
+              padding: '6px 14px', borderRadius: 999,
+              background: hideNotReplicable ? 'rgba(229,39,60,0.08)' : '#eaf1fa',
+              color: hideNotReplicable ? '#e5273c' : '#7ba1d8',
+              border: hideNotReplicable ? '1px solid rgba(229,39,60,0.2)' : '1px solid transparent',
+            }}
           >
-            {slug === 'all' ? 'Todas' : brands.find((b) => b.slug === slug)?.name}
-          </Button>
-        ))}
+            <span className="w-1.5 h-1.5 rounded-full" style={{ background: hideNotReplicable ? '#e5273c' : '#7ba1d8' }} />
+            {hideNotReplicable ? 'Não replicáveis ocultos' : 'Mostrar não replicáveis'}
+            {hideNotReplicable && <span style={{ opacity: 0.6, fontSize: 10 }}>(padrão)</span>}
+          </button>
+        </div>
+
+        {/* Legend */}
+        <div className="flex gap-4 flex-wrap items-center text-xs" style={{ color: '#7ba1d8' }}>
+          {[
+            { dot: { background: '#2659a5', border: 'none' }, label: 'Auto' },
+            { dot: { background: '#d7d900', border: 'none' }, label: 'Manual' },
+            { dot: { background: 'transparent', border: '1.5px dashed rgba(38,89,165,0.28)' }, label: 'Pendente' },
+          ].map((l) => (
+            <span key={l.label} className="flex items-center gap-1.5">
+              <span className="w-2.5 h-2.5 rounded-sm inline-block" style={l.dot} />
+              {l.label}
+            </span>
+          ))}
+        </div>
       </div>
 
       {/* Matrix table */}
-      <div className="overflow-x-auto">
-        <table className="w-full border-collapse text-sm">
+      <div
+        className="overflow-x-auto"
+        style={{ border: '1px solid rgba(38,89,165,0.14)', borderRadius: 22, background: '#ffffff' }}
+      >
+        <table className="w-full border-collapse" style={{ minWidth: 700 }}>
           <thead>
-            <tr>
-              <th className="text-left p-3 border-b font-medium text-muted-foreground min-w-48">Hit</th>
-              <th className="text-center p-3 border-b font-medium text-muted-foreground min-w-8">Origem</th>
-              {brands.map((b) => (
-                <th key={b.id} className="text-center p-3 border-b font-medium min-w-24">
+            <tr style={{ background: '#2659a5', color: '#ffffff' }}>
+              <th className="text-left px-4 py-3.5 text-[10px] font-semibold uppercase tracking-[0.1em]"
+                style={{ minWidth: 220, borderRight: '1px solid rgba(255,255,255,0.15)' }}>
+                Hit / Marca
+              </th>
+              <th className="px-3 py-3.5 text-[10px] font-semibold uppercase tracking-[0.1em] text-center"
+                style={{ minWidth: 80, borderRight: '1px solid rgba(255,255,255,0.15)' }}>
+                Origem
+              </th>
+              {brands.map((b, i) => (
+                <th key={b.id}
+                  className="px-3 py-3.5 text-[10px] font-semibold uppercase tracking-[0.1em] text-center"
+                  style={{ minWidth: 100, borderRight: i < brands.length - 1 ? '1px solid rgba(255,255,255,0.15)' : 'none' }}>
                   {b.name}
                 </th>
               ))}
             </tr>
           </thead>
           <tbody>
-            {contents.map((row) => (
-              <tr key={row.content_id} className="hover:bg-muted/30 transition-colors">
-                <td className="p-3 border-b">
+            {contents.map((row, rowIdx) => (
+              <tr
+                key={row.content_id}
+                className="group transition-colors"
+                style={{ borderBottom: rowIdx < contents.length - 1 ? '1px solid rgba(38,89,165,0.08)' : 'none' }}
+                onMouseEnter={(e) => (e.currentTarget as HTMLTableRowElement).style.background = '#eaf1fa'}
+                onMouseLeave={(e) => (e.currentTarget as HTMLTableRowElement).style.background = ''}
+              >
+                {/* Hit name */}
+                <td className="px-4 py-3" style={{ borderRight: '1px solid rgba(38,89,165,0.08)' }}>
                   <div className="flex flex-col gap-0.5">
-                    <span className="font-medium line-clamp-1">{row.content_name ?? '—'}</span>
-                    <span className="text-xs text-muted-foreground line-clamp-1">{row.hook}</span>
+                    <span className="text-sm font-semibold leading-snug line-clamp-1" style={{ color: '#2659a5' }}>
+                      {row.content_name ?? '—'}
+                    </span>
+                    {row.hook && (
+                      <span className="text-xs line-clamp-1" style={{ color: '#7ba1d8' }}>{row.hook}</span>
+                    )}
                   </div>
                 </td>
-                <td className="p-3 border-b text-center">
-                  <Badge variant="outline" className="text-xs">{row.origin_brand_slug}</Badge>
+
+                {/* Origin badge */}
+                <td className="px-3 py-3 text-center" style={{ borderRight: '1px solid rgba(38,89,165,0.08)' }}>
+                  <span
+                    className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wide"
+                    style={{ background: '#eaf1fa', color: '#2659a5' }}
+                  >
+                    {row.origin_brand_slug}
+                  </span>
                 </td>
-                {brands.map((brand) => {
-                  if (brand.id === row.origin_brand_id) {
+
+                {/* Brand cells */}
+                {brands.map((brand, bIdx) => {
+                  const isOrigin = brand.id === row.origin_brand_id
+                  if (isOrigin) {
                     return (
-                      <td key={brand.id} className="p-3 border-b text-center text-muted-foreground text-lg">
+                      <td key={brand.id}
+                        className="px-3 py-3 text-center text-sm font-light"
+                        style={{
+                          color: 'rgba(38,89,165,0.2)',
+                          borderRight: bIdx < brands.length - 1 ? '1px solid rgba(38,89,165,0.08)' : 'none',
+                        }}>
                         —
                       </td>
                     )
                   }
                   const cell = getCell(row.content_id, brand.id)
-                  const icon = cell ? cellIcon(cell) : '⬜'
-                  const oIcon = cell ? outputIcon(cell.output_mode) : ''
+                  const status = cell ? getCellStatus(cell) : 'empty'
                   return (
                     <td
                       key={brand.id}
-                      className="p-3 border-b text-center cursor-pointer hover:bg-accent/50 transition-colors"
-                      onClick={() => cell ? setSelectedCell(cell) : null}
+                      className="px-3 text-center"
+                      style={{
+                        borderRight: bIdx < brands.length - 1 ? '1px solid rgba(38,89,165,0.08)' : 'none',
+                        cursor: cell ? 'pointer' : 'default',
+                      }}
+                      onClick={() => cell && setSelectedCell(cell)}
                       title={cell?.status ?? 'Não gerado'}
                     >
-                      <span className="text-lg">{icon}{oIcon}</span>
+                      <XCell status={status} label={cell?.output_mode ?? undefined} />
                     </td>
                   )
                 })}
               </tr>
             ))}
+
+            {contents.length === 0 && (
+              <tr>
+                <td colSpan={brands.length + 2} className="py-12 text-center text-sm" style={{ color: '#7ba1d8' }}>
+                  Nenhum hit encontrado. Ajuste os filtros ou adicione seeds.
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
-
-        {contents.length === 0 && (
-          <div className="text-center py-12 text-muted-foreground">
-            <p>Nenhum hit encontrado. Adicione seeds no banco de dados.</p>
-          </div>
-        )}
       </div>
 
-      {/* Legend */}
-      <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
-        {[
-          { icon: '⬜', label: 'Não gerado' },
-          { icon: '❌', label: 'Não replicável' },
-          { icon: '⏳', label: 'Draft' },
-          { icon: '✅', label: 'Aprovado/In Play' },
-          { icon: '🚫', label: 'Rejeitado' },
-          { icon: '🖼️', label: 'Imagem' },
-          { icon: '🎥', label: 'Vídeo' },
-        ].map((l) => (
-          <span key={l.label} className="flex items-center gap-1">
-            {l.icon} {l.label}
-          </span>
-        ))}
-      </div>
+      <p className="text-xs" style={{ color: '#7ba1d8' }}>
+        Role lateralmente para ver todas as colunas. Clique em uma célula para ver detalhes e ações.
+      </p>
 
-      {/* Drawer lateral */}
+      {/* Detail drawer */}
       <Sheet open={!!selectedCell} onOpenChange={(open) => !open && setSelectedCell(null)}>
         <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
           <SheetHeader>
-            <SheetTitle>Detalhes da Replicação</SheetTitle>
+            <SheetTitle style={{ color: '#2659a5' }}>Detalhes da Replicação</SheetTitle>
           </SheetHeader>
           {selectedCell && (
             <div className="mt-4 space-y-4">
-              <div className="flex items-center gap-2">
-                <Badge variant="secondary">{selectedCell.origin_brand_name}</Badge>
-                <span className="text-muted-foreground">→</span>
-                <Badge>{selectedCell.target_brand_name}</Badge>
-                <span className="text-xl ml-auto">{cellIcon(selectedCell)}{outputIcon(selectedCell.output_mode)}</span>
+              <div className="flex items-center gap-2 flex-wrap">
+                <span
+                  className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide"
+                  style={{ background: '#eaf1fa', color: '#2659a5' }}
+                >
+                  {selectedCell.origin_brand_name}
+                </span>
+                <span style={{ color: '#7ba1d8' }}>→</span>
+                <span
+                  className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide"
+                  style={{ background: '#2659a5', color: '#ffffff' }}
+                >
+                  {selectedCell.target_brand_name}
+                </span>
+                <span className="ml-auto">
+                  <XCell status={getCellStatus(selectedCell)} />
+                </span>
               </div>
 
               {selectedCell.suggestion_id && (
@@ -209,16 +389,18 @@ export default function XadrezClient({ brands, matrix }: XadrezClientProps) {
                     estimated_impact_score: selectedCell.estimated_impact_score,
                     hook: selectedCell.hook,
                   } as Parameters<typeof ContentCard>[0]['suggestion']}
+                  variant="plan"
                   showMetrics
                   showOutputMode
                 />
               )}
 
               {!selectedCell.suggestion_id && (
-                <div className="py-8 text-center text-muted-foreground">
-                  <p>Réplica ainda não gerada</p>
-                  <Button
-                    className="mt-3"
+                <div className="py-8 text-center" style={{ color: '#7ba1d8' }}>
+                  <p className="text-sm font-medium">Réplica ainda não gerada</p>
+                  <button
+                    className="mt-4 text-sm font-semibold transition-opacity hover:opacity-80"
+                    style={{ padding: '10px 20px', borderRadius: 999, background: '#2659a5', color: '#ffffff' }}
                     onClick={async () => {
                       toast.loading('Iniciando pipeline...')
                       await fetch('/api/pipeline/run', {
@@ -234,35 +416,36 @@ export default function XadrezClient({ brands, matrix }: XadrezClientProps) {
                     }}
                   >
                     Gerar agora
-                  </Button>
+                  </button>
                 </div>
               )}
 
               {selectedCell.suggestion_id && !['not_replicable', 'rejected'].includes(selectedCell.status ?? '') && (
                 <div className="flex gap-2 flex-wrap">
-                  <Button
-                    size="sm"
+                  <button
+                    className="text-xs font-semibold transition-opacity hover:opacity-80"
+                    style={{ padding: '8px 16px', borderRadius: 999, background: '#2659a5', color: '#ffffff' }}
                     onClick={() => updateStatus(selectedCell.suggestion_id, 'approved')}
                   >
-                    ✅ Aprovar
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
+                    Aprovar
+                  </button>
+                  <button
+                    className="text-xs font-semibold transition-opacity hover:opacity-80"
+                    style={{ padding: '8px 16px', borderRadius: 999, background: '#ffffff', color: '#2659a5', border: '1px solid rgba(38,89,165,0.28)' }}
                     onClick={() => updateStatus(selectedCell.suggestion_id, 'rejected')}
                   >
-                    🚫 Rejeitar
-                  </Button>
-                  <Button
-                    size="sm"
-                    className="ml-auto"
+                    Rejeitar
+                  </button>
+                  <button
+                    className="text-xs font-semibold transition-opacity hover:opacity-80 ml-auto"
+                    style={{ padding: '8px 16px', borderRadius: 999, background: '#d7d900', color: '#2659a5' }}
                     onClick={() => {
                       setSelectedCell(null)
                       setLigarModal({ ...selectedCell, target_brand_name: selectedCell.target_brand_name })
                     }}
                   >
-                    ▶️ Ligar no Play
-                  </Button>
+                    Ligar no Play
+                  </button>
                 </div>
               )}
             </div>
