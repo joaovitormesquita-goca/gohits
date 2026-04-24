@@ -87,7 +87,6 @@ export default function PlanejamentoClient({ brands, initialSuggestions }: Plane
           <SelectContent>
             <SelectItem value="all">Todos</SelectItem>
             <SelectItem value="image">🖼️ Imagem</SelectItem>
-            <SelectItem value="video">🎥 Vídeo</SelectItem>
           </SelectContent>
         </Select>
       </div>

@@ -2,7 +2,7 @@
 
 **Status:** Accepted
 **Date:** 2026-04-24
-**Version:** 1.0
+**Version:** 2.0
 
 ## Context
 
@@ -28,3 +28,4 @@ Use a **4-step sequential pipeline** with strict input/output contracts at each 
 | Version | Date | Changes |
 |---------|------|---------|
 | 1.0 | 2026-04-24 | Initial decision |
+| 2.0 | 2026-04-24 | Step 3b (ElevenLabs + FFmpeg) desativado temporariamente. Pipeline simplificado: Evaluate → Adapt → Image. Foco em validação de CTR via Meta Ads com imagens geradas por GPT-image-1. Reativar quando fase de vídeo for retomada. |

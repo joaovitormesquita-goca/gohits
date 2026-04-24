@@ -8,19 +8,19 @@ import { toast } from 'sonner'
 import type { ContentSuggestion } from '@/lib/supabase/types'
 
 interface LigarNoPlayModalProps {
-  suggestion: ContentSuggestion & { origin_brand_name?: string; target_brand_name?: string }
+  suggestion: ContentSuggestion & {
+    origin_brand_name?: string
+    target_brand_name?: string
+    meta_ad_id?: string | null
+    meta_adset_id?: string | null
+    meta_status?: string | null
+  }
   open: boolean
   onClose: () => void
   onMarkInPlay?: () => void
 }
 
 function buildPackageText(s: LigarNoPlayModalProps['suggestion']): string {
-  const outputLabel = s.output_mode === 'image' ? '🖼️ Imagem' : '🎥 Vídeo'
-  const mediaLine = s.output_mode === 'image'
-    ? `🖼️ Imagem de referência: ${s.image_url ?? '[sem imagem]'}`
-    : `🎥 Vídeo pronto: ${s.final_video_url ?? '[processando]'}
-     🎙️ Áudio isolado: ${s.audio_url ?? '[sem áudio]'}`
-
   return `━━━━━━━━━━━━━━━━━━━━━━━━━
 🎬 PACOTE DE PRODUÇÃO — ${s.name ?? 'Sugestão'}
 ━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -28,7 +28,7 @@ function buildPackageText(s: LigarNoPlayModalProps['suggestion']): string {
 🎯 MARCA: ${s.target_brand_name ?? '—'}
 📱 PLATAFORMA: ${s.platform?.toUpperCase() ?? '—'}
 🏷️ PRODUTO: ${s.product ?? '—'}
-🎨 OUTPUT: ${outputLabel}
+🎨 OUTPUT: 🖼️ Imagem
 
 🪝 HOOK (primeiros 3s):
 ${s.hook ?? '—'}
@@ -46,7 +46,7 @@ ${s.description ?? '—'}
 ${s.briefing ?? '—'}
 
 🎞️ MÍDIA PRONTA:
-${mediaLine}
+🖼️ Imagem de referência: ${s.image_url ?? '[sem imagem]'}
 
 📊 IMPACTO ESTIMADO:
    • Score: ${s.estimated_impact_score?.toFixed(0) ?? '—'}/100
@@ -65,8 +65,11 @@ export default function LigarNoPlayModal({
   onMarkInPlay,
 }: LigarNoPlayModalProps) {
   const [copied, setCopied] = useState(false)
+  const [publishing, setPublishing] = useState(false)
+  const [publishResult, setPublishResult] = useState<{ ad_id: string; adset_id: string; created_new_adset: boolean } | null>(null)
 
   const packageText = buildPackageText(suggestion)
+  const metaStatus = (suggestion as { meta_status?: string | null }).meta_status ?? null
 
   async function copyAll() {
     await navigator.clipboard.writeText(packageText)
@@ -82,27 +85,61 @@ export default function LigarNoPlayModal({
     a.click()
   }
 
+  async function publishToMeta() {
+    setPublishing(true)
+    try {
+      const res = await fetch('/api/meta/publish', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ suggestionId: suggestion.id }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        toast.error(data.error ?? 'Erro ao publicar no Facebook Ads')
+        return
+      }
+      setPublishResult(data)
+      toast.success(`Ad publicado! ${data.created_new_adset ? 'Novo adset criado.' : 'Adicionado ao adset existente.'}`)
+    } catch {
+      toast.error('Falha de conexão ao publicar')
+    } finally {
+      setPublishing(false)
+    }
+  }
+
   return (
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             ▶️ Ligar no Play
-            <Badge variant="secondary">{suggestion.output_mode === 'image' ? '🖼️ Imagem' : '🎥 Vídeo'}</Badge>
+            <Badge variant="secondary">🖼️ Imagem</Badge>
+            {metaStatus === 'in_test' && (
+              <Badge className="bg-blue-100 text-blue-800 text-xs">⏳ Em teste no Facebook</Badge>
+            )}
+            {metaStatus === 'result_available' && (
+              <Badge className="bg-green-100 text-green-800 text-xs">✅ Resultado disponível</Badge>
+            )}
           </DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4">
-          {/* Media preview */}
-          {suggestion.output_mode === 'image' && suggestion.image_url && (
+          {/* Image preview */}
+          {suggestion.image_url && (
             <div className="rounded-lg overflow-hidden border">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={suggestion.image_url} alt="Imagem gerada" className="w-full max-h-64 object-contain bg-muted" />
             </div>
           )}
-          {suggestion.output_mode === 'video' && suggestion.final_video_url && (
-            <div className="rounded-lg overflow-hidden border">
-              <video src={suggestion.final_video_url} controls className="w-full max-h-64" />
+
+          {/* Meta Ads publish result */}
+          {publishResult && (
+            <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-sm">
+              <p className="font-medium text-green-800">✅ Ad publicado no Facebook Ads</p>
+              <p className="text-green-700 text-xs mt-1">Ad ID: {publishResult.ad_id} · Adset ID: {publishResult.adset_id}</p>
+              {publishResult.created_new_adset && (
+                <p className="text-green-600 text-xs">Adset anterior estava cheio — novo adset criado automaticamente.</p>
+              )}
             </div>
           )}
 
@@ -117,25 +154,22 @@ export default function LigarNoPlayModal({
               {copied ? '✅ Copiado!' : '📋 Copiar tudo'}
             </Button>
 
-            {suggestion.output_mode === 'image' && suggestion.image_url && (
+            {suggestion.image_url && (
               <Button variant="outline" onClick={() => downloadFile(suggestion.image_url!, `${suggestion.name ?? 'imagem'}.png`)}>
                 💾 Download PNG
               </Button>
             )}
 
-            {suggestion.output_mode === 'video' && (
-              <>
-                {suggestion.final_video_url && (
-                  <Button variant="outline" onClick={() => downloadFile(suggestion.final_video_url!, `${suggestion.name ?? 'video'}.mp4`)}>
-                    💾 Download MP4
-                  </Button>
-                )}
-                {suggestion.audio_url && (
-                  <Button variant="outline" onClick={() => downloadFile(suggestion.audio_url!, `${suggestion.name ?? 'audio'}.mp3`)}>
-                    🎙️ Download MP3
-                  </Button>
-                )}
-              </>
+            {/* Publish to Meta Ads — only when image exists and not yet published */}
+            {suggestion.image_url && !metaStatus && !publishResult && (
+              <Button
+                variant="outline"
+                className="border-blue-300 text-blue-700 hover:bg-blue-50"
+                disabled={publishing}
+                onClick={publishToMeta}
+              >
+                {publishing ? '⏳ Publicando...' : '🚀 Publicar no Facebook Ads'}
+              </Button>
             )}
 
             {onMarkInPlay && (

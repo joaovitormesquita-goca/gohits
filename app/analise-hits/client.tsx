@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import ContentCard from '@/components/ContentCard'
 import ImportCSVModal from '@/components/ImportCSVModal'
+import HitInsightsCard, { type HitInsights } from '@/components/HitInsightsCard'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -15,16 +16,25 @@ interface AnaliseHitsClientProps {
   brands: any[]
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   contents: any[]
+  // contentId → { meta_status, meta_ad_id, suggestion_id }
+  metaStatusMap?: Record<string, { meta_status: string | null; meta_ad_id: string | null; suggestion_id: string }>
 }
 
-export default function AnaliseHitsClient({ brands, contents }: AnaliseHitsClientProps) {
+const META_STATUS_LABEL: Record<string, string> = {
+  in_test: '⏳ Em teste no Facebook',
+  result_available: '✅ Resultado disponível',
+}
+
+export default function AnaliseHitsClient({ brands, contents, metaStatusMap = {} }: AnaliseHitsClientProps) {
   const router = useRouter()
   const [filterBrand, setFilterBrand] = useState<string>('all')
   const [filterPlatform, setFilterPlatform] = useState<string>('all')
   const [importModalOpen, setImportModalOpen] = useState(false)
   const [generateModal, setGenerateModal] = useState<{ contentId: string; contentName: string } | null>(null)
-  const [outputMode, setOutputMode] = useState<'image' | 'video'>('image')
   const [generating, setGenerating] = useState(false)
+  const [analyzing, setAnalyzing] = useState(false)
+  const [insights, setInsights] = useState<Record<string, HitInsights>>({})
+  const [metaInsights, setMetaInsights] = useState<Record<string, { ctr: number; impressions: number; spend: number }>>({})
 
   const filtered = useMemo(() => {
     return contents.filter((c) => {
@@ -56,7 +66,7 @@ export default function AnaliseHitsClient({ brands, contents }: AnaliseHitsClien
           body: JSON.stringify({
             originContentId: contentId,
             targetBrandId: brand.id,
-            outputMode,
+            outputMode: 'image',
           }),
         })
         success++
@@ -70,6 +80,48 @@ export default function AnaliseHitsClient({ brands, contents }: AnaliseHitsClien
     toast.success(`${success} réplicas iniciadas!`)
   }
 
+  async function runAnalysis() {
+    const contentIds = filtered.map((c) => c.id)
+    if (contentIds.length === 0) {
+      toast.error('Nenhum hit para analisar')
+      return
+    }
+    setAnalyzing(true)
+    try {
+      const res = await fetch('/api/analysis/hits', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contentIds }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        toast.error(data.error ?? 'Erro na análise')
+        return
+      }
+      const map: Record<string, HitInsights> = {}
+      for (const ins of data.insights ?? []) {
+        map[ins.content_id] = ins
+      }
+      setInsights(map)
+      toast.success(`Análise concluída para ${data.insights?.length ?? 0} hits`)
+    } catch {
+      toast.error('Falha ao conectar com a análise')
+    } finally {
+      setAnalyzing(false)
+    }
+  }
+
+  async function fetchMetaInsights(suggestionId: string, contentId: string) {
+    try {
+      const res = await fetch(`/api/meta/insights?suggestionId=${suggestionId}`)
+      if (!res.ok) return
+      const data = await res.json()
+      setMetaInsights((prev) => ({ ...prev, [contentId]: data }))
+    } catch {
+      // silently fail
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-start justify-between gap-4">
@@ -77,9 +129,19 @@ export default function AnaliseHitsClient({ brands, contents }: AnaliseHitsClien
           <h1 className="text-2xl font-bold">Análise de Hits</h1>
           <p className="text-muted-foreground text-sm">{filtered.length} hits</p>
         </div>
-        <Button onClick={() => setImportModalOpen(true)} variant="outline" size="sm">
-          📥 Importar CSV
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            onClick={runAnalysis}
+            disabled={analyzing}
+            variant="outline"
+            size="sm"
+          >
+            {analyzing ? '⏳ Analisando...' : '🔍 Analisar Hits'}
+          </Button>
+          <Button onClick={() => setImportModalOpen(true)} variant="outline" size="sm">
+            📥 Importar CSV
+          </Button>
+        </div>
       </div>
 
       {/* Top 5 */}
@@ -121,24 +183,52 @@ export default function AnaliseHitsClient({ brands, contents }: AnaliseHitsClien
             <SelectItem value="archive">Archive</SelectItem>
           </SelectContent>
         </Select>
+        {Object.keys(insights).length > 0 && (
+          <Button variant="ghost" size="sm" onClick={() => setInsights({})}>
+            ✕ Limpar análise
+          </Button>
+        )}
       </div>
 
       {/* Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-        {filtered.map((c) => (
-          <div key={c.id}>
-            {c.brands && (
-              <div className="mb-1">
-                <Badge variant="outline" className="text-xs">{c.brands.name}</Badge>
-              </div>
-            )}
-            <ContentCard
-              content={c}
-              showMetrics
-              onGenerate={() => setGenerateModal({ contentId: c.id, contentName: c.name ?? c.hook ?? '' })}
-            />
-          </div>
-        ))}
+        {filtered.map((c) => {
+          const metaInfo = metaStatusMap[c.id]
+          const contentInsights = insights[c.id]
+          const liveMetrics = metaInsights[c.id]
+          return (
+            <div key={c.id}>
+              {c.brands && (
+                <div className="mb-1 flex items-center gap-2 flex-wrap">
+                  <Badge variant="outline" className="text-xs">{c.brands.name}</Badge>
+                  {metaInfo?.meta_status && (
+                    <button
+                      className="text-xs text-blue-600 hover:underline"
+                      onClick={() => fetchMetaInsights(metaInfo.suggestion_id, c.id)}
+                    >
+                      {META_STATUS_LABEL[metaInfo.meta_status] ?? metaInfo.meta_status}
+                    </button>
+                  )}
+                </div>
+              )}
+              <ContentCard
+                content={c}
+                showMetrics
+                onGenerate={() => setGenerateModal({ contentId: c.id, contentName: c.name ?? c.hook ?? '' })}
+              />
+              {/* Live Meta Ads metrics */}
+              {liveMetrics && (
+                <div className="mt-1 rounded border bg-blue-50 p-2 text-xs text-blue-800 flex gap-3">
+                  <span>CTR real: <strong>{(liveMetrics.ctr * 100).toFixed(2)}%</strong></span>
+                  <span>Impressões: <strong>{liveMetrics.impressions.toLocaleString('pt-BR')}</strong></span>
+                  <span>Spend: <strong>R${liveMetrics.spend.toFixed(2)}</strong></span>
+                </div>
+              )}
+              {/* AI Insights */}
+              {contentInsights && <HitInsightsCard insights={contentInsights} />}
+            </div>
+          )
+        })}
       </div>
 
       {/* Generate replicas modal */}
@@ -150,18 +240,7 @@ export default function AnaliseHitsClient({ brands, contents }: AnaliseHitsClien
             </DialogHeader>
             <div className="space-y-4">
               <p className="text-sm text-muted-foreground">{generateModal.contentName}</p>
-              <div>
-                <label className="text-sm font-medium mb-2 block">Output mode</label>
-                <Select value={outputMode} onValueChange={(v) => v && setOutputMode(v as 'image' | 'video')}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="image">🖼️ Imagem</SelectItem>
-                    <SelectItem value="video">🎥 Vídeo</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+              <p className="text-xs text-muted-foreground">Geração de imagem via GPT-image-1 para validação de CTR.</p>
               <div className="flex gap-2">
                 <Button variant="outline" onClick={() => setGenerateModal(null)} className="flex-1">
                   Cancelar

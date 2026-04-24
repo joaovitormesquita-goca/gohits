@@ -1,3 +1,8 @@
+// Desativado temporariamente — ADR-002 v2.0
+// Pipeline focado em imagem para validação de CTR via Meta Ads.
+// Reativar quando fase de vídeo for retomada.
+
+/*
 const ELEVENLABS_API_URL = 'https://api.elevenlabs.io/v1'
 
 export async function synthesize(text: string, voiceId: string): Promise<Buffer> {
@@ -28,3 +33,6 @@ export async function synthesize(text: string, voiceId: string): Promise<Buffer>
   const arrayBuffer = await response.arrayBuffer()
   return Buffer.from(arrayBuffer)
 }
+*/
+
+export {}
