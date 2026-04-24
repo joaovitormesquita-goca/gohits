@@ -7,7 +7,7 @@ type ImageSize = '1024x1536' | '1024x1024'
 export async function generateImage(
   prompt: string,
   size: ImageSize = '1024x1536',
-): Promise<string> {
+): Promise<Buffer> {
   const response = await client.images.generate({
     model: 'gpt-image-1',
     prompt,
@@ -16,7 +16,7 @@ export async function generateImage(
     n: 1,
   })
 
-  const url = response.data?.[0]?.url
-  if (!url) throw new Error('No image URL returned from GPT-image-1')
-  return url
+  const b64 = response.data?.[0]?.b64_json
+  if (!b64) throw new Error('No image data returned from GPT-image-1')
+  return Buffer.from(b64, 'base64')
 }
