@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
-import { validateHeaders, parseCSV } from '@/lib/csv/parser'
+import { parseCSV } from '@/lib/csv/parser'
 
 export async function POST(req: NextRequest) {
   const formData = await req.formData()
@@ -11,18 +11,13 @@ export async function POST(req: NextRequest) {
   }
 
   const text = await file.text()
-  const firstLine = text.replace(/^\uFEFF/, '').split(/\r?\n/)[0] ?? ''
-  const headers = firstLine.split(',').map((h) => h.trim().toLowerCase())
-
-  const missingHeaders = validateHeaders(headers)
-  if (missingHeaders.length > 0) {
-    return NextResponse.json(
-      { error: `Colunas obrigatórias ausentes: ${missingHeaders.join(', ')}` },
-      { status: 400 },
-    )
-  }
-
   const { rows, errors } = parseCSV(text)
+
+  // Surface header errors immediately (parseCSV already validates required columns)
+  const headerError = errors.find((e) => e.includes('Colunas obrigatórias ausentes') || e.includes('CSV vazio'))
+  if (headerError) {
+    return NextResponse.json({ error: headerError }, { status: 400 })
+  }
 
   if (rows.length === 0) {
     return NextResponse.json({ error: 'Nenhuma linha válida encontrada', errors }, { status: 400 })

@@ -7,7 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge'
 import { toast } from 'sonner'
 import { downloadTemplate, CSV_HEADERS } from '@/lib/csv/template'
-import { validateHeaders, parseCSV } from '@/lib/csv/parser'
+import { parseCSV } from '@/lib/csv/parser'
 import type { ParsedHitRow } from '@/lib/csv/parser'
 
 interface ImportCSVModalProps {
@@ -45,16 +45,6 @@ export default function ImportCSVModal({ open, onClose, onSuccess }: ImportCSVMo
     const reader = new FileReader()
     reader.onload = (evt) => {
       const text = evt.target?.result as string
-      const firstLine = text.replace(/^\uFEFF/, '').split(/\r?\n/)[0] ?? ''
-      const headers = firstLine.split(',').map((h) => h.trim().toLowerCase())
-      const missing = validateHeaders(headers)
-
-      if (missing.length > 0) {
-        setParseErrors([`Colunas obrigatórias ausentes: ${missing.join(', ')}`])
-        setPreviewRows([])
-        return
-      }
-
       const { rows, errors } = parseCSV(text)
       setPreviewRows(rows.slice(0, PREVIEW_ROWS))
       setParseErrors(errors.slice(0, 5))

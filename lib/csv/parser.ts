@@ -47,7 +47,18 @@ function str(value: string | undefined): string | undefined {
   return v === '' ? undefined : v
 }
 
-function splitCSVLine(line: string): string[] {
+function detectDelimiter(headerLine: string): string {
+  const counts: Record<string, number> = {
+    ',': (headerLine.match(/,/g) ?? []).length,
+    ';': (headerLine.match(/;/g) ?? []).length,
+    '\t': (headerLine.match(/\t/g) ?? []).length,
+  }
+  if (counts[';'] > counts[','] && counts[';'] >= counts['\t']) return ';'
+  if (counts['\t'] > counts[','] && counts['\t'] > counts[';']) return '\t'
+  return ','
+}
+
+function splitCSVLine(line: string, delimiter = ','): string[] {
   const result: string[] = []
   let current = ''
   let inQuotes = false
@@ -61,7 +72,7 @@ function splitCSVLine(line: string): string[] {
       } else {
         inQuotes = !inQuotes
       }
-    } else if (char === ',' && !inQuotes) {
+    } else if (char === delimiter && !inQuotes) {
       result.push(current)
       current = ''
     } else {
@@ -82,7 +93,8 @@ export function parseCSV(text: string): ParseResult {
   }
 
   const headerLine = lines[0]
-  const headers = splitCSVLine(headerLine).map((h) => h.trim().toLowerCase())
+  const delimiter = detectDelimiter(headerLine)
+  const headers = splitCSVLine(headerLine, delimiter).map((h) => h.trim().toLowerCase())
 
   const missingHeaders = validateHeaders(headers)
   if (missingHeaders.length > 0) {
@@ -94,6 +106,7 @@ export function parseCSV(text: string): ParseResult {
 
   const idx = (col: string) => headers.indexOf(col)
   const dataLines = lines.slice(1, MAX_ROWS + 1)
+
   const rows: ParsedHitRow[] = []
   const errors: string[] = []
 
@@ -103,7 +116,7 @@ export function parseCSV(text: string): ParseResult {
 
   for (let i = 0; i < dataLines.length; i++) {
     const lineNum = i + 2
-    const values = splitCSVLine(dataLines[i])
+    const values = splitCSVLine(dataLines[i], delimiter)
     const get = (col: string) => values[idx(col)]?.trim()
 
     const brand_slug = get('brand_slug')?.toLowerCase().trim() as 'apice' | 'rituaria' | 'gocase'
