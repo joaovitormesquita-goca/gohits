@@ -7,11 +7,13 @@ interface ContentCardProps {
   suggestion?: ContentSuggestion
   showMetrics?: boolean
   showOutputMode?: boolean
-  onLigarNoPlay?: () => void
+  onOpenPauta?: () => void
   onApprove?: () => void
   onReject?: () => void
   onViewOrigin?: () => void
   onGenerate?: (outputMode: 'image' | 'video') => void
+  onNavigatePautas?: () => void
+  onNavigateImagens?: () => void
   /** 'plan' = full horizontal card (Planejamento), 'hit' = compact vertical (Radar/Análise) */
   variant?: 'plan' | 'hit'
 }
@@ -85,11 +87,13 @@ export default function ContentCard({
   suggestion,
   showMetrics = true,
   showOutputMode = false,
-  onLigarNoPlay,
+  onOpenPauta,
   onApprove,
   onReject,
   onViewOrigin,
   onGenerate,
+  onNavigatePautas,
+  onNavigateImagens,
   variant = 'plan',
 }: ContentCardProps) {
   const item = suggestion ?? content
@@ -98,14 +102,13 @@ export default function ContentCard({
   const hook = suggestion?.hook ?? content?.hook
   const product = suggestion?.product ?? content?.product
   const score = suggestion?.estimated_impact_score
-  const imageUrl = suggestion?.image_url ?? content?.image_url
   const isNotReplicable = suggestion?.status === 'not_replicable' || suggestion?.is_replicable === false
   const outputMode = suggestion?.output_mode
 
   if (!item) return null
 
   if (variant === 'hit') {
-    return <HitCard {...{ hook, product, score, metrics, isNotReplicable, outputMode, showMetrics, onLigarNoPlay, onApprove, onReject, onGenerate }} />
+    return <HitCard {...{ hook, product, score, metrics, isNotReplicable, outputMode, showMetrics, onApprove, onReject, onGenerate, onNavigatePautas, onNavigateImagens }} />
   }
 
   /* ── Plan-card (horizontal) ── */
@@ -127,7 +130,7 @@ export default function ContentCard({
         el.style.borderColor = 'rgba(38,89,165,0.14)'
       }}
     >
-      {/* Left panel — image or status indicator */}
+      {/* Left panel — brand color placeholder */}
       <div
         className="flex-shrink-0 flex flex-col items-center justify-center relative"
         style={{
@@ -152,15 +155,9 @@ export default function ContentCard({
             }}
           />
         )}
-
-        {imageUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={imageUrl} alt={hook ?? ''} className="w-full h-full object-cover absolute inset-0" />
-        ) : (
-          <span className="text-xs font-semibold text-center px-3 tracking-wide uppercase leading-relaxed">
-            {isNotReplicable ? 'Não\nreplicável' : outputMode === 'video' ? 'Vídeo\ngerado' : 'Imagem\ngerada'}
-          </span>
-        )}
+        <span className="text-xs font-semibold text-center px-3 tracking-wide uppercase leading-relaxed">
+          {isNotReplicable ? 'Não\nreplicável' : 'Pauta\ngerada'}
+        </span>
       </div>
 
       {/* Right panel — content */}
@@ -249,17 +246,14 @@ export default function ContentCard({
         {/* Actions */}
         {!isNotReplicable && (
           <div className="flex gap-2 pt-1 flex-wrap">
-            {onLigarNoPlay && (
-              <PillButton variant="primary" onClick={onLigarNoPlay}>Ligar no Play</PillButton>
+            {onOpenPauta && (
+              <PillButton variant="primary" onClick={onOpenPauta}>Ver Pauta</PillButton>
             )}
             {onApprove && (
               <PillButton variant="default" onClick={onApprove}>Aprovar</PillButton>
             )}
             {onReject && (
               <PillButton variant="ghost" onClick={onReject}>Rejeitar</PillButton>
-            )}
-            {onGenerate && (
-              <PillButton variant="ghost" onClick={() => onGenerate('image')}>Gerar imagem</PillButton>
             )}
             {onViewOrigin && (
               <PillButton variant="ghost" onClick={onViewOrigin}>Ver hit origem</PillButton>
@@ -274,7 +268,7 @@ export default function ContentCard({
 /* ── Compact hit-card (vertical) ── */
 function HitCard({
   hook, product, score, metrics, isNotReplicable, outputMode, showMetrics,
-  onLigarNoPlay, onApprove, onReject, onGenerate,
+  onApprove, onReject, onGenerate, onNavigatePautas, onNavigateImagens,
 }: {
   hook?: string | null
   product?: string | null
@@ -283,10 +277,11 @@ function HitCard({
   isNotReplicable: boolean
   outputMode?: string | null
   showMetrics: boolean
-  onLigarNoPlay?: () => void
   onApprove?: () => void
   onReject?: () => void
   onGenerate?: (mode: 'image' | 'video') => void
+  onNavigatePautas?: () => void
+  onNavigateImagens?: () => void
 }) {
   return (
     <div
@@ -353,10 +348,11 @@ function HitCard({
       {/* Actions */}
       {!isNotReplicable && (
         <div className="flex gap-2 flex-wrap pl-2">
-          {onLigarNoPlay && <PillButton variant="primary" onClick={onLigarNoPlay}>Ligar no Play</PillButton>}
+          {onGenerate && <PillButton variant="primary" onClick={() => onGenerate('image')}>Gerar Pauta</PillButton>}
           {onApprove && <PillButton variant="default" onClick={onApprove}>Aprovar</PillButton>}
           {onReject && <PillButton variant="ghost" onClick={onReject}>Rejeitar</PillButton>}
-          {onGenerate && <PillButton variant="ghost" onClick={() => onGenerate('image')}>Gerar</PillButton>}
+          {onNavigatePautas && <PillButton variant="ghost" onClick={onNavigatePautas}>Pautas</PillButton>}
+          {onNavigateImagens && <PillButton variant="ghost" onClick={onNavigateImagens}>Imagens</PillButton>}
         </div>
       )}
     </div>

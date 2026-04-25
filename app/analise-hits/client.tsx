@@ -275,6 +275,8 @@ export default function AnaliseHitsClient({ brands, contents, metaStatusMap = {}
                 variant="hit"
                 showMetrics
                 onGenerate={() => setGenerateModal({ contentId: c.id, contentName: c.name ?? c.hook ?? '' })}
+                onNavigatePautas={() => router.push(`/planejamento?hitId=${encodeURIComponent(c.id)}`)}
+                onNavigateImagens={() => router.push(`/imagens?hitId=${encodeURIComponent(c.id)}`)}
               />
               {liveMetrics && (
                 <div
@@ -297,11 +299,11 @@ export default function AnaliseHitsClient({ brands, contents, metaStatusMap = {}
         <Dialog open onOpenChange={() => setGenerateModal(null)}>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle style={{ color: '#2659a5' }}>Gerar réplicas para outras marcas</DialogTitle>
+              <DialogTitle style={{ color: '#2659a5' }}>Gerar pautas para outras marcas</DialogTitle>
             </DialogHeader>
             <div className="space-y-4">
               <p className="text-sm" style={{ color: '#7ba1d8' }}>{generateModal.contentName}</p>
-              <p className="text-xs" style={{ color: '#7ba1d8' }}>Geração de imagem via GPT-image-1 para validação de CTR.</p>
+              <p className="text-xs" style={{ color: '#7ba1d8' }}>Gera pautas adaptadas (hook, cenário, roteiro) para cada marca. Imagens são geradas depois na aba Imagens.</p>
               <div className="flex gap-2">
                 <Button variant="outline" onClick={() => setGenerateModal(null)} className="flex-1">
                   Cancelar

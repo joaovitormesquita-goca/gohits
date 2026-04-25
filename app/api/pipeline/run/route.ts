@@ -8,7 +8,7 @@ interface PipelineRunRequest {
 
 export async function POST(req: NextRequest) {
   const { originContentId, targetBrandId }: PipelineRunRequest = await req.json()
-  // outputMode is always 'image' — video disabled per ADR-002 v2.0
+  // outputMode is always 'image' — video disabled per ADR-002 v3.0
   const origin = req.nextUrl.origin
 
   // Step 1: Evaluate replicability
@@ -39,15 +39,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Adapt step failed' }, { status: 500 })
   }
 
-  // Step 3: Generate image (only mode available)
-  const imageRes = await fetch(`${origin}/api/image`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ suggestionId }),
-  })
-  if (!imageRes.ok) {
-    return NextResponse.json({ error: 'Image generation failed' }, { status: 500 })
-  }
-  const imageData = await imageRes.json()
-  return NextResponse.json({ status: 'done', suggestionId, image_url: imageData.image_url })
+  // Step 3 (image) is now on-demand via /api/image — see ADR-002 v3.0
+  return NextResponse.json({ status: 'done', suggestionId })
 }
