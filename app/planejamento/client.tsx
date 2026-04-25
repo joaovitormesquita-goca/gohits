@@ -1,9 +1,10 @@
 'use client'
 
 import { useState, useMemo } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
 import ContentCard from '@/components/ContentCard'
-import LigarNoPlayModal from '@/components/LigarNoPlayModal'
+import PautaDetailModal from '@/components/PautaDetailModal'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
 interface Brand { id: string; slug: string; name: string }
@@ -24,11 +25,14 @@ const STATUS_OPTS = [
 ]
 
 export default function PlanejamentoClient({ brands, initialSuggestions }: PlanejamentoClientProps) {
+  const searchParams = useSearchParams()
+  const hitId = searchParams.get('hitId')
+
   const [suggestions] = useState(initialSuggestions)
   const [filterBrand, setFilterBrand] = useState<string>('all')
   const [filterStatus, setFilterStatus] = useState<string>('active')
   const [filterMode, setFilterMode] = useState<string>('all')
-  const [ligarModal, setLigarModal] = useState<typeof initialSuggestions[number] | null>(null)
+  const [pautaModal, setPautaModal] = useState<typeof initialSuggestions[number] | null>(null)
 
   const stats = useMemo(() => {
     const total = suggestions.length
@@ -40,22 +44,24 @@ export default function PlanejamentoClient({ brands, initialSuggestions }: Plane
 
   const filtered = useMemo(() => {
     return suggestions.filter((s) => {
+      if (hitId && s.origin_content?.id !== hitId) return false
       if (filterBrand !== 'all' && s.target_brand?.slug !== filterBrand) return false
       if (filterStatus === 'active' && s.status === 'not_replicable') return false
       if (filterStatus !== 'all' && filterStatus !== 'active' && s.status !== filterStatus) return false
       if (filterMode !== 'all' && s.output_mode !== filterMode) return false
       return true
     })
-  }, [suggestions, filterBrand, filterStatus, filterMode])
+  }, [suggestions, hitId, filterBrand, filterStatus, filterMode])
 
   const hiddenCount = useMemo(() => {
     if (filterStatus !== 'active') return 0
     return suggestions.filter((s) => {
+      const hitMatch = !hitId || s.origin_content?.id === hitId
       const brandMatch = filterBrand === 'all' || s.target_brand?.slug === filterBrand
       const modeMatch = filterMode === 'all' || s.output_mode === filterMode
-      return s.status === 'not_replicable' && brandMatch && modeMatch
+      return s.status === 'not_replicable' && hitMatch && brandMatch && modeMatch
     }).length
-  }, [suggestions, filterBrand, filterStatus, filterMode])
+  }, [suggestions, hitId, filterBrand, filterStatus, filterMode])
 
   async function updateStatus(id: string, status: string) {
     const res = await fetch('/api/suggestions/status', {
@@ -79,8 +85,20 @@ export default function PlanejamentoClient({ brands, initialSuggestions }: Plane
             Planejamento
           </h1>
           <p className="text-sm mt-1.5" style={{ color: '#7ba1d8' }}>
-            A IA cruza cada hit com todas as marcas e gera variações. Aprove, reprove ou ligue no Play.
+            A IA cruza cada hit com todas as marcas e gera pautas adaptadas. Aprove ou reprove.
           </p>
+          {hitId && (
+            <p className="text-xs mt-1 font-medium" style={{ color: '#2659a5' }}>
+              Filtrando por hit de origem
+              <button
+                className="ml-2 underline underline-offset-2 hover:opacity-70"
+                onClick={() => window.history.replaceState(null, '', '/planejamento')}
+                style={{ color: '#7ba1d8' }}
+              >
+                Limpar filtro
+              </button>
+            </p>
+          )}
         </div>
         <button
           className="inline-flex items-center gap-2 text-xs font-semibold transition-opacity hover:opacity-80"
@@ -94,7 +112,7 @@ export default function PlanejamentoClient({ brands, initialSuggestions }: Plane
       {/* KPI Row */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
         {[
-          { label: 'Sugestões geradas', value: stats.total, sub: `${brands.length} marcas`, variant: 'default' },
+          { label: 'Pautas geradas', value: stats.total, sub: `${brands.length} marcas`, variant: 'default' },
           { label: 'Aprovadas', value: stats.approved, sub: stats.total ? `${Math.round(stats.approved / stats.total * 100)}% do total` : '—', variant: 'yellow' },
           { label: 'Não replicáveis', value: stats.notReplicable, sub: stats.total ? `IA rejeitou · ${Math.round(stats.notReplicable / stats.total * 100)}%` : '—', variant: 'muted' },
           { label: 'Pendentes', value: stats.pending, sub: 'Aguardando aprovação', variant: 'blue' },
@@ -234,7 +252,7 @@ export default function PlanejamentoClient({ brands, initialSuggestions }: Plane
       <div className="flex items-center gap-2.5">
         <div className="w-1.5 h-1.5 rounded-full" style={{ background: '#d7d900' }} />
         <span className="text-sm font-semibold" style={{ color: '#2659a5' }}>
-          Sugestões — ordenadas por score de impacto
+          Pautas — ordenadas por score de impacto
         </span>
         <span
           className="text-[10px] font-semibold uppercase tracking-wide px-2.5 py-1 rounded-full ml-1"
@@ -247,7 +265,7 @@ export default function PlanejamentoClient({ brands, initialSuggestions }: Plane
       {/* List */}
       {filtered.length === 0 ? (
         <div className="text-center py-16" style={{ color: '#7ba1d8' }}>
-          <p className="text-lg font-medium">Nenhuma sugestão encontrada</p>
+          <p className="text-lg font-medium">Nenhuma pauta encontrada</p>
           {filterStatus === 'active' && stats.notReplicable > 0 ? (
             <p className="text-sm mt-1">
               {stats.notReplicable} não replicáveis ocultas.{' '}
@@ -256,7 +274,7 @@ export default function PlanejamentoClient({ brands, initialSuggestions }: Plane
               </button>
             </p>
           ) : (
-            <p className="text-sm mt-1">Execute o pipeline para gerar sugestões</p>
+            <p className="text-sm mt-1">Execute o pipeline em Análise de Hits para gerar pautas</p>
           )}
         </div>
       ) : (
@@ -268,7 +286,7 @@ export default function PlanejamentoClient({ brands, initialSuggestions }: Plane
               variant="plan"
               showMetrics
               showOutputMode
-              onLigarNoPlay={() => setLigarModal({ ...s, target_brand_name: s.target_brand?.name })}
+              onOpenPauta={() => setPautaModal({ ...s, target_brand_name: s.target_brand?.name })}
               onApprove={() => updateStatus(s.id, 'approved')}
               onReject={() => updateStatus(s.id, 'rejected')}
             />
@@ -276,15 +294,13 @@ export default function PlanejamentoClient({ brands, initialSuggestions }: Plane
         </div>
       )}
 
-      {ligarModal && (
-        <LigarNoPlayModal
-          suggestion={ligarModal}
-          open={!!ligarModal}
-          onClose={() => setLigarModal(null)}
-          onMarkInPlay={() => {
-            updateStatus(ligarModal.id, 'in_play')
-            setLigarModal(null)
-          }}
+      {pautaModal && (
+        <PautaDetailModal
+          suggestion={pautaModal}
+          open={!!pautaModal}
+          onClose={() => setPautaModal(null)}
+          onApprove={() => updateStatus(pautaModal.id, 'approved')}
+          onReject={() => updateStatus(pautaModal.id, 'rejected')}
         />
       )}
     </div>
