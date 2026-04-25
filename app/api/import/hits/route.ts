@@ -90,19 +90,29 @@ export async function POST(req: NextRequest) {
       row.thumbstop_ratio != null
 
     if (hasMetrics) {
+      const contentId = (contentData as { id: string }).id
+      const metricsPayload = {
+        content_id: contentId,
+        date: row.date,
+        views: row.views ?? 0,
+        impressions: row.impressions ?? 0,
+        click_count: row.click_count ?? 0,
+        spend: row.spend ?? 0,
+        roas: row.roas ?? 0,
+        engagement_rate: row.engagement_rate ?? 0,
+        thumbstop_ratio: row.thumbstop_ratio ?? 0,
+      }
+
+      // Delete existing row for same content+date to ensure idempotent reimport
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (supabase.from('content_metrics') as any)
+        .delete()
+        .eq('content_id', contentId)
+        .eq('date', row.date)
+
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { error: metricsError } = await (supabase.from('content_metrics') as any)
-        .insert({
-          content_id: (contentData as { id: string }).id,
-          date: row.date,
-          views: row.views ?? 0,
-          impressions: row.impressions ?? 0,
-          click_count: row.click_count ?? 0,
-          spend: row.spend ?? 0,
-          roas: row.roas ?? 0,
-          engagement_rate: row.engagement_rate ?? 0,
-          thumbstop_ratio: row.thumbstop_ratio ?? 0,
-        })
+        .insert(metricsPayload)
 
       if (!metricsError) {
         metrics_inserted++

@@ -1,9 +1,11 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { Suspense, useState, useMemo } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
 import LigarNoPlayModal from '@/components/LigarNoPlayModal'
 import ContentCard from '@/components/ContentCard'
+import BrandSelector from '@/components/BrandSelector'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 
 interface XadrezClientProps {
@@ -81,9 +83,10 @@ function XCell({ status, label, onClick }: { status: CellStatus; label?: string;
 }
 
 export default function XadrezClient({ brands, matrix }: XadrezClientProps) {
+  const searchParams = useSearchParams()
+  const filterOriginBrand = searchParams.get('brand') ?? 'all'
   const [selectedCell, setSelectedCell] = useState<typeof matrix[number] | null>(null)
   const [ligarModal, setLigarModal] = useState<typeof matrix[number] | null>(null)
-  const [filterOriginBrand, setFilterOriginBrand] = useState<string>('all')
   const [hideNotReplicable, setHideNotReplicable] = useState<boolean>(true)
 
   const contents = useMemo(() => {
@@ -192,26 +195,12 @@ export default function XadrezClient({ brands, matrix }: XadrezClientProps) {
       {/* Filters + Legend */}
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div className="flex flex-wrap gap-3 items-center">
-          {/* Origin brand pills */}
+          {/* Origin brand selector */}
           <div className="flex gap-1.5 flex-wrap items-center">
             <span className="text-xs font-medium" style={{ color: '#7ba1d8' }}>Marca origem:</span>
-            {['all', ...brands.map((b) => b.slug)].map((slug) => {
-              const isActive = filterOriginBrand === slug
-              return (
-                <button
-                  key={slug}
-                  onClick={() => setFilterOriginBrand(slug)}
-                  className="text-xs font-medium transition-all"
-                  style={{
-                    padding: '6px 14px', borderRadius: 999,
-                    background: isActive ? '#2659a5' : '#eaf1fa',
-                    color: isActive ? '#ffffff' : '#7ba1d8',
-                  }}
-                >
-                  {slug === 'all' ? 'Todas' : brands.find((b) => b.slug === slug)?.name}
-                </button>
-              )
-            })}
+            <Suspense fallback={null}>
+              <BrandSelector brands={brands} />
+            </Suspense>
           </div>
 
           {/* Not-replicable toggle */}

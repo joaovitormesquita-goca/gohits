@@ -4,6 +4,8 @@ import { useState, useMemo } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
 import ContentCard from '@/components/ContentCard'
+import ContentPreviewModal from '@/components/ContentPreviewModal'
+import BrandSelector from '@/components/BrandSelector'
 import PautaDetailModal from '@/components/PautaDetailModal'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
@@ -29,10 +31,10 @@ export default function PlanejamentoClient({ brands, initialSuggestions }: Plane
   const hitId = searchParams.get('hitId')
 
   const [suggestions] = useState(initialSuggestions)
-  const [filterBrand, setFilterBrand] = useState<string>('all')
   const [filterStatus, setFilterStatus] = useState<string>('active')
   const [filterMode, setFilterMode] = useState<string>('all')
   const [pautaModal, setPautaModal] = useState<typeof initialSuggestions[number] | null>(null)
+  const [previewSuggestion, setPreviewSuggestion] = useState<typeof initialSuggestions[number] | null>(null)
 
   const stats = useMemo(() => {
     const total = suggestions.length
@@ -45,23 +47,21 @@ export default function PlanejamentoClient({ brands, initialSuggestions }: Plane
   const filtered = useMemo(() => {
     return suggestions.filter((s) => {
       if (hitId && s.origin_content?.id !== hitId) return false
-      if (filterBrand !== 'all' && s.target_brand?.slug !== filterBrand) return false
       if (filterStatus === 'active' && s.status === 'not_replicable') return false
       if (filterStatus !== 'all' && filterStatus !== 'active' && s.status !== filterStatus) return false
       if (filterMode !== 'all' && s.output_mode !== filterMode) return false
       return true
     })
-  }, [suggestions, hitId, filterBrand, filterStatus, filterMode])
+  }, [suggestions, hitId, filterStatus, filterMode])
 
   const hiddenCount = useMemo(() => {
     if (filterStatus !== 'active') return 0
     return suggestions.filter((s) => {
       const hitMatch = !hitId || s.origin_content?.id === hitId
-      const brandMatch = filterBrand === 'all' || s.target_brand?.slug === filterBrand
       const modeMatch = filterMode === 'all' || s.output_mode === filterMode
-      return s.status === 'not_replicable' && hitMatch && brandMatch && modeMatch
+      return s.status === 'not_replicable' && hitMatch && modeMatch
     }).length
-  }, [suggestions, hitId, filterBrand, filterStatus, filterMode])
+  }, [suggestions, hitId, filterStatus, filterMode])
 
   async function updateStatus(id: string, status: string) {
     const res = await fetch('/api/suggestions/status', {
@@ -109,6 +109,9 @@ export default function PlanejamentoClient({ brands, initialSuggestions }: Plane
         </button>
       </div>
 
+      {/* Brand Selector */}
+      <BrandSelector brands={brands} />
+
       {/* KPI Row */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
         {[
@@ -128,7 +131,6 @@ export default function PlanejamentoClient({ brands, initialSuggestions }: Plane
               borderRadius: 22,
             }}
           >
-            {/* Dot */}
             <div
               className="absolute top-4 right-4 w-2.5 h-2.5 rounded-full"
               style={{
@@ -209,20 +211,10 @@ export default function PlanejamentoClient({ brands, initialSuggestions }: Plane
           })}
         </div>
 
-        {/* Brand + mode selects */}
+        {/* Mode select */}
         <div className="flex flex-wrap gap-3">
-          <Select value={filterBrand} onValueChange={(v) => v && setFilterBrand(v)}>
-            <SelectTrigger className="w-44 text-xs">
-              <SelectValue placeholder="Marca destino" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todas as marcas</SelectItem>
-              {brands.map((b) => <SelectItem key={b.slug} value={b.slug}>{b.name}</SelectItem>)}
-            </SelectContent>
-          </Select>
-
           <Select value={filterMode} onValueChange={(v) => v && setFilterMode(v)}>
-            <SelectTrigger className="w-40 text-xs">
+            <SelectTrigger className="w-full sm:w-40 text-xs">
               <SelectValue placeholder="Output" />
             </SelectTrigger>
             <SelectContent>
@@ -286,6 +278,7 @@ export default function PlanejamentoClient({ brands, initialSuggestions }: Plane
               variant="plan"
               showMetrics
               showOutputMode
+              onPreview={() => setPreviewSuggestion(s)}
               onOpenPauta={() => setPautaModal({ ...s, target_brand_name: s.target_brand?.name })}
               onApprove={() => updateStatus(s.id, 'approved')}
               onReject={() => updateStatus(s.id, 'rejected')}
@@ -301,6 +294,27 @@ export default function PlanejamentoClient({ brands, initialSuggestions }: Plane
           onClose={() => setPautaModal(null)}
           onApprove={() => updateStatus(pautaModal.id, 'approved')}
           onReject={() => updateStatus(pautaModal.id, 'rejected')}
+        />
+      )}
+
+      {previewSuggestion && (
+        <ContentPreviewModal
+          suggestion={{ ...previewSuggestion, target_brand_name: previewSuggestion.target_brand?.name }}
+          open={!!previewSuggestion}
+          onClose={() => setPreviewSuggestion(null)}
+          onOpenPauta={() => {
+            const s = previewSuggestion
+            setPreviewSuggestion(null)
+            setPautaModal({ ...s, target_brand_name: s.target_brand?.name })
+          }}
+          onApprove={() => {
+            updateStatus(previewSuggestion.id, 'approved')
+            setPreviewSuggestion(null)
+          }}
+          onReject={() => {
+            updateStatus(previewSuggestion.id, 'rejected')
+            setPreviewSuggestion(null)
+          }}
         />
       )}
     </div>

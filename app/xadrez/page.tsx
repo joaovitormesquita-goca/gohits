@@ -1,3 +1,4 @@
+import { Suspense } from 'react'
 import { createClient } from '@/lib/supabase/server'
 import XadrezClient from './client'
 
@@ -12,11 +13,13 @@ export default async function XadrezPage() {
     .order('content_name')
 
   return (
-    <XadrezClient
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      brands={(brands ?? []) as any[]}
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      matrix={(matrix ?? []) as any[]}
-    />
+    <Suspense>
+      <XadrezClient
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        brands={(brands ?? []) as any[]}
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        matrix={(matrix ?? []) as any[]}
+      />
+    </Suspense>
   )
 }

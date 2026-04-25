@@ -1,11 +1,16 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { Suspense, useState, useMemo } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
+import BrandSelector from '@/components/BrandSelector'
+
+interface Brand { id: string; slug: string; name: string }
 
 interface AlertasClientProps {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   alerts: any[]
+  brands: Brand[]
 }
 
 function formatRelativeTime(dateStr: string): string {
@@ -22,29 +27,18 @@ const TYPE_LABELS: Record<string, string> = {
   daily_report: 'Relatório',
 }
 
-export default function AlertasClient({ alerts }: AlertasClientProps) {
+export default function AlertasClient({ alerts, brands }: AlertasClientProps) {
+  const searchParams = useSearchParams()
+  const brandFromUrl = searchParams.get('brand') ?? 'all'
   const [filterType, setFilterType] = useState<string>('all')
-  const [filterBrand, setFilterBrand] = useState<string>('all')
-
-  const brands = useMemo(() => {
-    const seen = new Set<string>()
-    const result: { slug: string; name: string }[] = []
-    for (const a of alerts) {
-      if (a.brands && !seen.has(a.brands.slug)) {
-        seen.add(a.brands.slug)
-        result.push({ slug: a.brands.slug, name: a.brands.name })
-      }
-    }
-    return result
-  }, [alerts])
 
   const filtered = useMemo(() => {
     return alerts.filter((a) => {
       if (filterType !== 'all' && a.type !== filterType) return false
-      if (filterBrand !== 'all' && a.brands?.slug !== filterBrand) return false
+      if (brandFromUrl !== 'all' && a.brands?.slug !== brandFromUrl) return false
       return true
     })
-  }, [alerts, filterType, filterBrand])
+  }, [alerts, filterType, brandFromUrl])
 
   async function copyWhatsApp(message: string) {
     await navigator.clipboard.writeText(message)
@@ -74,9 +68,13 @@ export default function AlertasClient({ alerts }: AlertasClientProps) {
         </div>
       </div>
 
-      {/* Filters */}
+      {/* Brand Selector */}
+      <Suspense fallback={null}>
+        <BrandSelector brands={brands} />
+      </Suspense>
+
+      {/* Type filter */}
       <div className="flex flex-wrap gap-3 items-center">
-        {/* Type filter */}
         <div className="flex gap-1.5 flex-wrap">
           {(['all', 'hit', 'daily_report'] as const).map((t) => (
             <button
@@ -104,41 +102,6 @@ export default function AlertasClient({ alerts }: AlertasClientProps) {
             </button>
           ))}
         </div>
-
-        {/* Brand filter */}
-        {brands.length > 0 && (
-          <div className="flex gap-1.5 flex-wrap">
-            <button
-              onClick={() => setFilterBrand('all')}
-              className="inline-flex items-center text-xs font-medium transition-all"
-              style={{
-                padding: '6px 12px',
-                borderRadius: 999,
-                background: filterBrand === 'all' ? '#eaf1fa' : 'transparent',
-                color: '#7ba1d8',
-                border: '1px solid rgba(38,89,165,0.14)',
-              }}
-            >
-              Todas as marcas
-            </button>
-            {brands.map((b) => (
-              <button
-                key={b.slug}
-                onClick={() => setFilterBrand(b.slug)}
-                className="inline-flex items-center text-xs font-medium transition-all"
-                style={{
-                  padding: '6px 12px',
-                  borderRadius: 999,
-                  background: filterBrand === b.slug ? '#d7d900' : 'transparent',
-                  color: filterBrand === b.slug ? '#2659a5' : '#7ba1d8',
-                  border: '1px solid rgba(38,89,165,0.14)',
-                }}
-              >
-                {b.name}
-              </button>
-            ))}
-          </div>
-        )}
       </div>
 
       {/* List */}

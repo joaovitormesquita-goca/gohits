@@ -179,7 +179,7 @@ export default function ImagensClient({ brands, initialSuggestions }: ImagensCli
 
         {/* Brand select */}
         <Select value={filterBrand} onValueChange={(v) => v && setFilterBrand(v)}>
-          <SelectTrigger className="w-44 text-xs">
+          <SelectTrigger className="w-full sm:w-44 text-xs">
             <SelectValue placeholder="Marca destino" />
           </SelectTrigger>
           <SelectContent>
@@ -190,7 +190,7 @@ export default function ImagensClient({ brands, initialSuggestions }: ImagensCli
 
         {/* Platform select */}
         <Select value={filterPlatform} onValueChange={(v) => v && setFilterPlatform(v)}>
-          <SelectTrigger className="w-40 text-xs">
+          <SelectTrigger className="w-full sm:w-40 text-xs">
             <SelectValue placeholder="Plataforma" />
           </SelectTrigger>
           <SelectContent>

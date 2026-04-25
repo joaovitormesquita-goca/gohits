@@ -3,10 +3,11 @@
 import type { Content, ContentSuggestion, ContentMetrics } from '@/lib/supabase/types'
 
 interface ContentCardProps {
-  content?: Content & { content_metrics?: ContentMetrics[] }
+  content?: Content & { content_metrics?: ContentMetrics[]; brands?: { id: string; name: string; slug: string } | null }
   suggestion?: ContentSuggestion
   showMetrics?: boolean
   showOutputMode?: boolean
+  onPreview?: () => void
   onOpenPauta?: () => void
   onApprove?: () => void
   onReject?: () => void
@@ -16,6 +17,13 @@ interface ContentCardProps {
   onNavigateImagens?: () => void
   /** 'plan' = full horizontal card (Planejamento), 'hit' = compact vertical (Radar/Análise) */
   variant?: 'plan' | 'hit'
+}
+
+const BRAND_COLORS: Record<string, string> = {
+  apice: '#e61782',
+  rituaria: '#f8ae13',
+  gocase: '#3dbfef',
+  default: '#2659a5',
 }
 
 function fmt(n: number | null | undefined, suffix = '') {
@@ -87,6 +95,7 @@ export default function ContentCard({
   suggestion,
   showMetrics = true,
   showOutputMode = false,
+  onPreview,
   onOpenPauta,
   onApprove,
   onReject,
@@ -108,19 +117,40 @@ export default function ContentCard({
   if (!item) return null
 
   if (variant === 'hit') {
-    return <HitCard {...{ hook, product, score, metrics, isNotReplicable, outputMode, showMetrics, onApprove, onReject, onGenerate, onNavigatePautas, onNavigateImagens }} />
+    return (
+      <HitCard
+        hook={hook}
+        product={product}
+        score={score}
+        metrics={metrics}
+        isNotReplicable={isNotReplicable}
+        outputMode={outputMode}
+        showMetrics={showMetrics}
+        imageUrl={content?.image_url}
+        brandSlug={content?.brands?.slug ?? null}
+        onPreview={onPreview}
+        onApprove={onApprove}
+        onReject={onReject}
+        onGenerate={onGenerate}
+        onNavigatePautas={onNavigatePautas}
+        onNavigateImagens={onNavigateImagens}
+      />
+    )
   }
 
   /* ── Plan-card (horizontal) ── */
+  const planImageUrl = suggestion?.image_url
+
   return (
     <div
-      className="flex overflow-hidden transition-colors duration-200"
+      className={`flex overflow-hidden transition-colors duration-200${onPreview ? ' cursor-pointer' : ''}`}
       style={{
         background: '#ffffff',
         border: '1px solid rgba(38,89,165,0.14)',
         borderRadius: 22,
         opacity: isNotReplicable ? 0.72 : 1,
       }}
+      onClick={onPreview}
       onMouseEnter={(e) => {
         const el = e.currentTarget as HTMLDivElement
         el.style.borderColor = 'rgba(38,89,165,0.28)'
@@ -130,34 +160,45 @@ export default function ContentCard({
         el.style.borderColor = 'rgba(38,89,165,0.14)'
       }}
     >
-      {/* Left panel — brand color placeholder */}
+      {/* Left panel */}
       <div
-        className="flex-shrink-0 flex flex-col items-center justify-center relative"
+        className="flex-shrink-0 flex flex-col items-center justify-center relative overflow-hidden"
         style={{
           width: 140,
-          background: isNotReplicable
-            ? '#fbf2e7'
+          background: planImageUrl ? 'transparent'
+            : isNotReplicable ? '#fbf2e7'
             : outputMode === 'video' ? '#d7d900' : '#2659a5',
           color: isNotReplicable
             ? '#7ba1d8'
             : outputMode === 'video' ? '#2659a5' : '#d7d900',
         }}
       >
-        {/* 3-dot signature */}
-        {!isNotReplicable && (
-          <div
-            className="absolute top-3.5 left-3.5 w-2 h-2 rounded-full"
-            style={{
-              background: outputMode === 'video' ? '#2659a5' : '#d7d900',
-              boxShadow: outputMode === 'video'
-                ? '14px 0 0 #2659a5, 28px 0 0 #2659a5'
-                : '14px 0 0 #d7d900, 28px 0 0 #d7d900',
-            }}
+        {planImageUrl ? (
+          <img
+            src={planImageUrl}
+            alt=""
+            className="absolute inset-0 w-full h-full object-cover"
+            style={{ borderRadius: '22px 0 0 22px' }}
           />
+        ) : (
+          <>
+            {/* 3-dot signature */}
+            {!isNotReplicable && (
+              <div
+                className="absolute top-3.5 left-3.5 w-2 h-2 rounded-full"
+                style={{
+                  background: outputMode === 'video' ? '#2659a5' : '#d7d900',
+                  boxShadow: outputMode === 'video'
+                    ? '14px 0 0 #2659a5, 28px 0 0 #2659a5'
+                    : '14px 0 0 #d7d900, 28px 0 0 #d7d900',
+                }}
+              />
+            )}
+            <span className="text-xs font-semibold text-center px-3 tracking-wide uppercase leading-relaxed">
+              {isNotReplicable ? 'Não\nreplicável' : 'Pauta\ngerada'}
+            </span>
+          </>
         )}
-        <span className="text-xs font-semibold text-center px-3 tracking-wide uppercase leading-relaxed">
-          {isNotReplicable ? 'Não\nreplicável' : 'Pauta\ngerada'}
-        </span>
       </div>
 
       {/* Right panel — content */}
@@ -268,7 +309,8 @@ export default function ContentCard({
 /* ── Compact hit-card (vertical) ── */
 function HitCard({
   hook, product, score, metrics, isNotReplicable, outputMode, showMetrics,
-  onApprove, onReject, onGenerate, onNavigatePautas, onNavigateImagens,
+  imageUrl, brandSlug,
+  onPreview, onApprove, onReject, onGenerate, onNavigatePautas, onNavigateImagens,
 }: {
   hook?: string | null
   product?: string | null
@@ -277,21 +319,28 @@ function HitCard({
   isNotReplicable: boolean
   outputMode?: string | null
   showMetrics: boolean
+  imageUrl?: string | null
+  brandSlug?: string | null
+  onPreview?: () => void
   onApprove?: () => void
   onReject?: () => void
   onGenerate?: (mode: 'image' | 'video') => void
   onNavigatePautas?: () => void
   onNavigateImagens?: () => void
 }) {
+  const hasThumbnail = !!imageUrl || !!brandSlug
+  const fallbackColor = BRAND_COLORS[brandSlug ?? ''] ?? BRAND_COLORS.default
+
   return (
     <div
-      className="relative flex flex-col gap-3 p-5 overflow-hidden transition-colors duration-200"
+      className={`relative flex flex-col overflow-hidden transition-colors duration-200${onPreview ? ' cursor-pointer' : ''}`}
       style={{
         background: '#ffffff',
         border: '1px solid rgba(38,89,165,0.14)',
         borderRadius: 22,
         opacity: isNotReplicable ? 0.72 : 1,
       }}
+      onClick={onPreview}
       onMouseEnter={(e) => {
         ;(e.currentTarget as HTMLDivElement).style.borderColor = 'rgba(38,89,165,0.28)'
       }}
@@ -299,62 +348,92 @@ function HitCard({
         ;(e.currentTarget as HTMLDivElement).style.borderColor = 'rgba(38,89,165,0.14)'
       }}
     >
-      {/* Left accent bar */}
+      {/* Left accent bar (above thumbnail if present) */}
       <div
-        className="absolute left-0 top-0 bottom-0 w-1.5 rounded-l-[22px]"
-        style={{ background: score != null && score >= 75 ? '#2659a5' : '#d7d900' }}
+        className="absolute left-0 top-0 bottom-0 w-1.5 z-10"
+        style={{
+          background: score != null && score >= 75 ? '#2659a5' : '#d7d900',
+          borderRadius: '22px 0 0 22px',
+        }}
       />
 
-      {/* Top: badges + output mode */}
-      <div className="flex items-center gap-2 flex-wrap pl-2">
-        {score != null && <ScoreBadge score={score} />}
-        {outputMode && <OutputBadge mode={outputMode} />}
-        {isNotReplicable && (
-          <span
-            className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide"
-            style={{ background: 'rgba(38,89,165,0.08)', color: '#7ba1d8' }}
+      {/* Thumbnail */}
+      {hasThumbnail && (
+        imageUrl ? (
+          <img
+            src={imageUrl}
+            alt=""
+            className="w-full object-cover"
+            style={{ height: 144 }}
+          />
+        ) : (
+          <div
+            className="w-full flex items-center justify-center font-bold text-lg uppercase"
+            style={{
+              height: 144,
+              background: fallbackColor,
+              color: '#ffffff',
+              letterSpacing: '0.05em',
+            }}
           >
-            Não replicável
-          </span>
+            {(brandSlug ?? '').slice(0, 2).toUpperCase()}
+          </div>
+        )
+      )}
+
+      {/* Content */}
+      <div className="flex flex-col gap-3 p-5">
+        {/* Top: badges + output mode */}
+        <div className="flex items-center gap-2 flex-wrap pl-2">
+          {score != null && <ScoreBadge score={score} />}
+          {outputMode && <OutputBadge mode={outputMode} />}
+          {isNotReplicable && (
+            <span
+              className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide"
+              style={{ background: 'rgba(38,89,165,0.08)', color: '#7ba1d8' }}
+            >
+              Não replicável
+            </span>
+          )}
+        </div>
+
+        {/* Hook */}
+        <p className="text-sm font-semibold leading-snug pl-2" style={{ color: '#2659a5' }}>
+          {hook ?? '—'}
+        </p>
+        {product && (
+          <p className="text-xs pl-2" style={{ color: '#7ba1d8' }}>{product}</p>
+        )}
+
+        {/* Metrics */}
+        {showMetrics && metrics && (
+          <div
+            className="flex gap-4 pt-3 border-t text-xs pl-2"
+            style={{ borderColor: 'rgba(38,89,165,0.14)', color: '#7ba1d8' }}
+          >
+            {metrics.ctr != null && (
+              <span>CTR <strong style={{ color: '#2659a5' }}>{(metrics.ctr * 100).toFixed(1)}%</strong></span>
+            )}
+            {metrics.views != null && (
+              <span>Views <strong style={{ color: '#2659a5' }}>{fmt(metrics.views)}</strong></span>
+            )}
+            {metrics.roas != null && (
+              <span>ROAS <strong style={{ color: '#2659a5' }}>{metrics.roas.toFixed(1)}x</strong></span>
+            )}
+          </div>
+        )}
+
+        {/* Actions */}
+        {!isNotReplicable && (
+          <div className="flex gap-2 flex-wrap pl-2">
+            {onGenerate && <PillButton variant="primary" onClick={() => onGenerate('image')}>Gerar Pauta</PillButton>}
+            {onApprove && <PillButton variant="default" onClick={onApprove}>Aprovar</PillButton>}
+            {onReject && <PillButton variant="ghost" onClick={onReject}>Rejeitar</PillButton>}
+            {onNavigatePautas && <PillButton variant="ghost" onClick={onNavigatePautas}>Pautas</PillButton>}
+            {onNavigateImagens && <PillButton variant="ghost" onClick={onNavigateImagens}>Imagens</PillButton>}
+          </div>
         )}
       </div>
-
-      {/* Hook */}
-      <p className="text-sm font-semibold leading-snug pl-2" style={{ color: '#2659a5' }}>
-        {hook ?? '—'}
-      </p>
-      {product && (
-        <p className="text-xs pl-2" style={{ color: '#7ba1d8' }}>{product}</p>
-      )}
-
-      {/* Metrics */}
-      {showMetrics && metrics && (
-        <div
-          className="flex gap-4 pt-3 border-t text-xs pl-2"
-          style={{ borderColor: 'rgba(38,89,165,0.14)', color: '#7ba1d8' }}
-        >
-          {metrics.ctr != null && (
-            <span>CTR <strong style={{ color: '#2659a5' }}>{(metrics.ctr * 100).toFixed(1)}%</strong></span>
-          )}
-          {metrics.views != null && (
-            <span>Views <strong style={{ color: '#2659a5' }}>{fmt(metrics.views)}</strong></span>
-          )}
-          {metrics.roas != null && (
-            <span>ROAS <strong style={{ color: '#2659a5' }}>{metrics.roas.toFixed(1)}x</strong></span>
-          )}
-        </div>
-      )}
-
-      {/* Actions */}
-      {!isNotReplicable && (
-        <div className="flex gap-2 flex-wrap pl-2">
-          {onGenerate && <PillButton variant="primary" onClick={() => onGenerate('image')}>Gerar Pauta</PillButton>}
-          {onApprove && <PillButton variant="default" onClick={onApprove}>Aprovar</PillButton>}
-          {onReject && <PillButton variant="ghost" onClick={onReject}>Rejeitar</PillButton>}
-          {onNavigatePautas && <PillButton variant="ghost" onClick={onNavigatePautas}>Pautas</PillButton>}
-          {onNavigateImagens && <PillButton variant="ghost" onClick={onNavigateImagens}>Imagens</PillButton>}
-        </div>
-      )}
     </div>
   )
 }
@@ -378,7 +457,10 @@ function PillButton({
 
   return (
     <button
-      onClick={onClick}
+      onClick={(e) => {
+        e.stopPropagation()
+        onClick()
+      }}
       className="inline-flex items-center gap-1.5 text-xs font-semibold transition-opacity hover:opacity-80 cursor-pointer"
       style={{ padding: '6px 12px', borderRadius: 999, ...styles[variant] }}
     >

@@ -21,10 +21,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="pt-BR" className={poppins.variable}>
       <body className="min-h-screen antialiased" style={{ background: '#fbf2e7' }}>
         {/* App shell — cream background */}
-        <div style={{ maxWidth: 1480, margin: '0 auto', padding: 20, minHeight: '100vh' }}>
+        <div className="p-2 sm:p-5" style={{ maxWidth: 1480, margin: '0 auto', minHeight: '100vh' }}>
           {/* Frame — white rounded container */}
           <div
-            className="min-h-[calc(100vh-40px)]"
+            className="min-h-[calc(100vh-16px)] sm:min-h-[calc(100vh-40px)]"
             style={{
               background: '#ffffff',
               borderRadius: 32,
@@ -33,7 +33,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             }}
           >
             <AppNav />
-            <main style={{ padding: '28px 32px 48px' }}>
+            <main className="px-4 sm:px-8 pt-6 sm:pt-7 pb-10 sm:pb-12">
               {children}
             </main>
           </div>
