@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -66,10 +66,24 @@ export default function LigarNoPlayModal({
 }: LigarNoPlayModalProps) {
   const [copied, setCopied] = useState(false)
   const [publishing, setPublishing] = useState(false)
-  const [publishResult, setPublishResult] = useState<{ ad_id: string; adset_id: string; created_new_adset: boolean } | null>(null)
+  const [publishResult, setPublishResult] = useState<{
+    ad_id: string
+    adset_id: string
+    created_new_adset: boolean
+    ads_manager_url?: string
+  } | null>(null)
+  const [metaConfigured, setMetaConfigured] = useState<boolean | null>(null)
 
   const packageText = buildPackageText(suggestion)
   const metaStatus = (suggestion as { meta_status?: string | null }).meta_status ?? null
+
+  useEffect(() => {
+    if (!open) return
+    fetch('/api/meta/status')
+      .then((r) => r.json())
+      .then((d: { configured: boolean }) => setMetaConfigured(d.configured))
+      .catch(() => setMetaConfigured(false))
+  }, [open])
 
   async function copyAll() {
     await navigator.clipboard.writeText(packageText)
@@ -107,6 +121,8 @@ export default function LigarNoPlayModal({
     }
   }
 
+  const metaButtonDisabled = publishing || metaConfigured === false
+
   return (
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
@@ -140,6 +156,16 @@ export default function LigarNoPlayModal({
               {publishResult.created_new_adset && (
                 <p className="text-green-600 text-xs">Adset anterior estava cheio — novo adset criado automaticamente.</p>
               )}
+              {publishResult.ads_manager_url && (
+                <a
+                  href={publishResult.ads_manager_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-block mt-2 text-xs text-blue-700 underline hover:text-blue-900"
+                >
+                  🔗 Ver no Ads Manager
+                </a>
+              )}
             </div>
           )}
 
@@ -164,8 +190,9 @@ export default function LigarNoPlayModal({
             {suggestion.image_url && !metaStatus && !publishResult && (
               <Button
                 variant="outline"
-                className="border-blue-300 text-blue-700 hover:bg-blue-50"
-                disabled={publishing}
+                className="border-blue-300 text-blue-700 hover:bg-blue-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={metaButtonDisabled}
+                title={metaConfigured === false ? 'Meta Ads não configurado — contate o admin' : undefined}
                 onClick={publishToMeta}
               >
                 {publishing ? '⏳ Publicando...' : '🚀 Publicar no Facebook Ads'}
