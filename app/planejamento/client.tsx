@@ -7,6 +7,7 @@ import ContentCard from '@/components/ContentCard'
 import ContentPreviewModal from '@/components/ContentPreviewModal'
 import BrandSelector from '@/components/BrandSelector'
 import PautaDetailModal from '@/components/PautaDetailModal'
+import GenerateImageModal from '@/components/GenerateImageModal'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
 interface Brand { id: string; slug: string; name: string }
@@ -30,11 +31,12 @@ export default function PlanejamentoClient({ brands, initialSuggestions }: Plane
   const searchParams = useSearchParams()
   const hitId = searchParams.get('hitId')
 
-  const [suggestions] = useState(initialSuggestions)
+  const [suggestions, setSuggestions] = useState(initialSuggestions)
   const [filterStatus, setFilterStatus] = useState<string>('active')
   const [filterMode, setFilterMode] = useState<string>('all')
   const [pautaModal, setPautaModal] = useState<typeof initialSuggestions[number] | null>(null)
   const [previewSuggestion, setPreviewSuggestion] = useState<typeof initialSuggestions[number] | null>(null)
+  const [imageModal, setImageModal] = useState<typeof initialSuggestions[number] | null>(null)
 
   const stats = useMemo(() => {
     const total = suggestions.length
@@ -282,6 +284,7 @@ export default function PlanejamentoClient({ brands, initialSuggestions }: Plane
               onOpenPauta={() => setPautaModal({ ...s, target_brand_name: s.target_brand?.name })}
               onApprove={() => updateStatus(s.id, 'approved')}
               onReject={() => updateStatus(s.id, 'rejected')}
+              onGenerateImage={() => setImageModal(s)}
             />
           ))}
         </div>
@@ -294,6 +297,20 @@ export default function PlanejamentoClient({ brands, initialSuggestions }: Plane
           onClose={() => setPautaModal(null)}
           onApprove={() => updateStatus(pautaModal.id, 'approved')}
           onReject={() => updateStatus(pautaModal.id, 'rejected')}
+        />
+      )}
+
+      {imageModal && (
+        <GenerateImageModal
+          suggestionId={imageModal.id}
+          hook={imageModal.hook ?? ''}
+          open={!!imageModal}
+          onClose={() => setImageModal(null)}
+          onSuccess={(url) => {
+            setSuggestions((prev) =>
+              prev.map((s) => (s.id === imageModal.id ? { ...s, image_url: url } : s)),
+            )
+          }}
         />
       )}
 

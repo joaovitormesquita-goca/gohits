@@ -124,7 +124,7 @@ export default function ImageCard({ suggestion, onImageGenerated, onMetaPublishe
               🖼️
             </div>
             <p className="text-xs font-semibold" style={{ color: '#7ba1d8' }}>Imagem não gerada</p>
-            <p className="text-[10px]" style={{ color: '#7ba1d8' }}>Clique em "Gerar Imagem" para criar</p>
+            <p className="text-[10px]" style={{ color: '#7ba1d8' }}>Clique em &quot;Gerar Imagem&quot; para criar</p>
           </div>
         )}
 

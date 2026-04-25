@@ -13,6 +13,7 @@ interface ContentCardProps {
   onReject?: () => void
   onViewOrigin?: () => void
   onGenerate?: (outputMode: 'image' | 'video') => void
+  onGenerateImage?: () => void
   onNavigatePautas?: () => void
   onNavigateImagens?: () => void
   /** 'plan' = full horizontal card (Planejamento), 'hit' = compact vertical (Radar/Análise) */
@@ -101,6 +102,7 @@ export default function ContentCard({
   onReject,
   onViewOrigin,
   onGenerate,
+  onGenerateImage,
   onNavigatePautas,
   onNavigateImagens,
   variant = 'plan',
@@ -290,6 +292,11 @@ export default function ContentCard({
             {onOpenPauta && (
               <PillButton variant="primary" onClick={onOpenPauta}>Ver Pauta</PillButton>
             )}
+            {onGenerateImage
+              && !suggestion?.image_url
+              && !['not_replicable', 'rejected'].includes(suggestion?.status ?? '') && (
+                <PillButton variant="yellow" onClick={onGenerateImage}>Gerar Imagem</PillButton>
+              )}
             {onApprove && (
               <PillButton variant="default" onClick={onApprove}>Aprovar</PillButton>
             )}
