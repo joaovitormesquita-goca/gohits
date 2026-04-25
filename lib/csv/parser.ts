@@ -1,11 +1,10 @@
 export const REQUIRED_HEADERS = ['brand_slug', 'hook', 'platform', 'date'] as const
-const VALID_BRAND_SLUGS = ['apice', 'rituaria', 'gocase'] as const
 const VALID_PLATFORMS = ['meta', 'tiktok', 'archive'] as const
 const MAX_ROWS = 500
 const MAX_HOOK_LENGTH = 500
 
 export interface ParsedHitRow {
-  brand_slug: 'apice' | 'rituaria' | 'gocase'
+  brand_slug: string
   name?: string
   hook: string
   product?: string
@@ -106,13 +105,13 @@ export function parseCSV(text: string): ParseResult {
     const values = splitCSVLine(dataLines[i])
     const get = (col: string) => values[idx(col)]?.trim()
 
-    const brand_slug = get('brand_slug')?.toLowerCase().trim() as 'apice' | 'rituaria' | 'gocase'
+    const brand_slug = get('brand_slug')?.toLowerCase().trim() ?? ''
     const hook = get('hook')?.trim()
     const platform = get('platform')?.toLowerCase().trim() as 'meta' | 'tiktok' | 'archive'
     const date = get('date')?.trim()
 
-    if (!brand_slug || !VALID_BRAND_SLUGS.includes(brand_slug)) {
-      errors.push(`Linha ${lineNum}: brand_slug inválido "${brand_slug}" — use: apice, rituaria ou gocase`)
+    if (!brand_slug) {
+      errors.push(`Linha ${lineNum}: brand_slug está vazio`)
       continue
     }
 
